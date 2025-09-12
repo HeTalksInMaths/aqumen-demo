@@ -45,7 +45,7 @@ class BedrockClient:
         """Check if Bedrock client is properly initialized"""
         return self.initialized and self.bedrock_client is not None
     
-    async def make_api_call(self, model_tier: str, prompt: str, operation: str, max_tokens: int = 1000) -> str:
+    def make_api_call(self, model_tier: str, prompt: str, operation: str, max_tokens: int = 1000) -> str:
         """
         Make actual API call to Bedrock
         
@@ -60,7 +60,7 @@ class BedrockClient:
         """
         if not self.is_available():
             # Fallback to simulation if Bedrock not available
-            return await self._simulate_api_call(operation)
+            return self._simulate_api_call(operation)
         
         try:
             model_id = self.models.get(model_tier)
@@ -101,9 +101,9 @@ class BedrockClient:
         except Exception as e:
             st.warning(f"Bedrock API error for {operation}: {str(e)}")
             # Fallback to simulation on error
-            return await self._simulate_api_call(operation)
+            return self._simulate_api_call(operation)
     
-    async def _simulate_api_call(self, operation: str) -> str:
+    def _simulate_api_call(self, operation: str) -> str:
         """Fallback simulation when Bedrock is unavailable"""
         # Add realistic delay
         delay = random.uniform(1, 3)
