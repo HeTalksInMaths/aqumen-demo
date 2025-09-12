@@ -1,16 +1,18 @@
 import streamlit as st
+import time
+import random
+from datetime import datetime
 import json
-from pathlib import Path
 
 # Page config
 st.set_page_config(
-    page_title="Aqumen Demo - Original vs Modular",
+    page_title="Aqumen.ai Demo - Interactive Streamlit Version",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS for better styling
 st.markdown("""
 <style>
     .main-header {
@@ -23,19 +25,38 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     
-    .architecture-card {
+    .step-container {
         background: rgba(31, 41, 55, 0.8);
-        padding: 1.5rem;
+        padding: 2rem;
         border-radius: 0.5rem;
         border-left: 4px solid #3B82F6;
         margin: 1rem 0;
     }
     
-    .code-block {
+    .pipeline-log {
         background: rgba(17, 24, 39, 1);
         padding: 1rem;
         border-radius: 0.5rem;
-        border: 1px solid rgba(75, 85, 99, 0.3);
+        font-family: monospace;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .error-span {
+        background: #FEF3C7;
+        color: #92400E;
+        padding: 2px 4px;
+        border-radius: 3px;
+        border: 1px solid #F59E0B;
+        cursor: pointer;
+        margin: 0 2px;
+    }
+    
+    .error-span-selected {
+        background: #FEE2E2;
+        color: #991B1B;
+        border-color: #EF4444;
     }
     
     .metric-card {
@@ -45,460 +66,523 @@ st.markdown("""
         border-radius: 0.5rem;
         border: 1px solid rgba(59, 130, 246, 0.3);
     }
+    
+    .attempt-card {
+        background: rgba(31, 41, 55, 0.6);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #8B5CF6;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# Sample data
+SAMPLE_DATA = {
+    'Machine Learning - Reinforcement Learning': {
+        'difficulty_categories': {
+            "Beginner": ["Q-learning basics", "Markov Decision Processes", "Reward function design"],
+            "Intermediate": ["Policy gradient methods", "Actor-Critic architectures", "Exploration vs exploitation"],
+            "Advanced": ["Multi-agent RL", "Hierarchical RL", "Meta-learning in RL"]
+        },
+        'final_question': {
+            'title': "Q-Learning Implementation Error Detection",
+            'code': """def epsilon_greedy_policy(Q_values, epsilon=0.1):
+    \"\"\"Select action using epsilon-greedy strategy\"\"\"
+    if np.random.random() < epsilon:
+        # Exploration: choose random action
+        return [ERROR_1]np.argmax(Q_values)[/ERROR_1]
+    else:
+        # Exploitation: choose best action
+        return [ERROR_2]np.random.choice(len(Q_values))[/ERROR_2]
+
+def update_q_table(Q, state, action, reward, next_state, alpha=0.1, gamma=0.9):
+    \"\"\"Update Q-table using Bellman equation\"\"\"
+    current_q = Q[state][action]
+    max_next_q = np.max(Q[next_state])
+    
+    # Temporal difference update
+    Q[state][action] = current_q + alpha * [ERROR_3](reward + gamma * max_next_q - current_q)[/ERROR_3]
+    
+    return Q""",
+            'errors': [
+                {
+                    'id': 1,
+                    'description': "Should use np.random.choice() for exploration, not np.argmax()",
+                    'severity': "high",
+                    'correct': True
+                },
+                {
+                    'id': 2,
+                    'description': "Should use np.argmax() for exploitation, not random choice", 
+                    'severity': "high",
+                    'correct': True
+                },
+                {
+                    'id': 3,
+                    'description': "Bellman update is actually correct - this is a trick question",
+                    'severity': "trick",
+                    'correct': False
+                }
+            ]
+        }
+    }
+}
+
+# Initialize session state
+def init_session_state():
+    if 'current_step' not in st.session_state:
+        st.session_state.current_step = 'input'
+    if 'user_topic' not in st.session_state:
+        st.session_state.user_topic = ''
+    if 'selected_difficulty' not in st.session_state:
+        st.session_state.selected_difficulty = None
+    if 'selected_subtopic' not in st.session_state:
+        st.session_state.selected_subtopic = None
+    if 'generation_log' not in st.session_state:
+        st.session_state.generation_log = []
+    if 'adversarial_attempts' not in st.session_state:
+        st.session_state.adversarial_attempts = []
+    if 'selected_errors' not in st.session_state:
+        st.session_state.selected_errors = set()
+    if 'evaluation_results' not in st.session_state:
+        st.session_state.evaluation_results = None
+
+def add_log(message):
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    st.session_state.generation_log.append(f"[{timestamp}] {message}")
+
+def simulate_api_call(operation, delay_range=(1, 3)):
+    """Simulate API call with realistic delays"""
+    delay = random.uniform(*delay_range)
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i in range(100):
+        progress_bar.progress(i + 1)
+        status_text.text(f"{operation}... {i+1}%")
+        time.sleep(delay / 100)
+    
+    progress_bar.empty()
+    status_text.empty()
+    
+    # Small chance of simulated failure for realism
+    if random.random() < 0.1:
+        raise Exception(f"Model differentiation failed - retry needed")
+    
+    return f"Success: {operation}"
+
+def run_adversarial_pipeline():
+    """Simulate the adversarial pipeline with live updates"""
+    st.session_state.adversarial_attempts = []
+    
+    add_log("🧠 Step 2: Generating conceptual error catalog (Opus)")
+    simulate_api_call("Generating error catalog", (1, 2))
+    add_log("✅ Error catalog generated")
+    
+    add_log("🎯 Step 3: Generating adversarial question (Opus)")  
+    simulate_api_call("Creating adversarial question", (1, 2))
+    add_log("✅ Adversarial question created")
+    
+    # Adversarial attempts loop
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        add_log(f"🔄 Attempt {attempt}: Testing model differentiation")
+        
+        # Add attempt to session state
+        st.session_state.adversarial_attempts.append({
+            'attempt': attempt,
+            'status': 'testing',
+            'sonnet_response': 'Analyzing...',
+            'haiku_response': 'Generating...'
+        })
+        
+        # Simulate parallel model testing
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info("🧠 Sonnet: Analyzing code...")
+            simulate_api_call("Sonnet validation", (1, 2))
+        with col2:
+            st.info("⚡ Haiku: Testing response...")
+            simulate_api_call("Haiku testing", (1, 2))
+        
+        # Update attempt results
+        st.session_state.adversarial_attempts[-1].update({
+            'status': 'success' if attempt >= 2 else 'failed',
+            'sonnet_response': '✅ Correctly identifies the error' if attempt <= 2 else '✅ Comprehensive analysis',
+            'haiku_response': '❌ Misses the conceptual issue' if attempt <= 2 else '✅ Actually got it right (retry needed)' if attempt == 3 else '❌ Falls for semantic trap'
+        })
+        
+        add_log("⚖️ Step 6: Judging model responses (Opus)")
+        simulate_api_call("Response judgment", (0.5, 1))
+        
+        # Success condition
+        if attempt >= 2 or random.random() > 0.3:
+            add_log("✅ Pipeline successful: Model differentiation achieved")
+            st.session_state.adversarial_attempts[-1]['status'] = 'success'
+            break
+        else:
+            add_log(f"❌ Attempt {attempt} failed: Insufficient differentiation, retrying...")
+            time.sleep(1)
+    
+    add_log("📝 Step 7: Creating student assessment (Opus)")
+    simulate_api_call("Student question creation", (1, 2))
+    add_log("🎉 Assessment ready!")
+    
+    st.session_state.current_step = 'assessment'
+
+def render_code_with_errors(code_text):
+    """Render code with clickable error spans"""
+    # Replace error markers with clickable spans
+    for i in range(1, 4):
+        error_class = "error-span-selected" if i in st.session_state.selected_errors else "error-span"
+        code_text = code_text.replace(f'[ERROR_{i}]', f'<span class="{error_class}" onclick="toggleError({i})">')
+        code_text = code_text.replace(f'[/ERROR_{i}]', '</span>')
+    
+    return code_text
+
 def main():
+    init_session_state()
+    
     # Header
-    st.markdown('<h1 class="main-header">🧠 Aqumen.ai Demo Architecture</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #9CA3AF;">Multi-Model Adversarial Pipeline: Original vs Modular Implementation</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 Aqumen.ai Interactive Demo</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #9CA3AF;">Multi-Model Adversarial Pipeline for Intelligent Error Detection</p>', unsafe_allow_html=True)
     
     # Sidebar navigation
-    st.sidebar.title("📋 Navigation")
-    page = st.sidebar.selectbox(
+    st.sidebar.title("🎯 Demo Navigation")
+    
+    # Architecture toggle
+    demo_mode = st.sidebar.radio(
         "Select View:",
-        ["🏠 Overview", "📊 Architecture Comparison", "📁 File Structure", "💻 Code Examples", "🚀 Demo Links"]
+        ["🚀 Interactive Demo", "📊 Architecture Comparison"],
+        index=0 if st.session_state.current_step != 'architecture' else 1
     )
     
-    if page == "🏠 Overview":
-        show_overview()
-    elif page == "📊 Architecture Comparison":
+    if demo_mode == "📊 Architecture Comparison":
         show_architecture_comparison()
-    elif page == "📁 File Structure":
-        show_file_structure()
-    elif page == "💻 Code Examples":
-        show_code_examples()
-    elif page == "🚀 Demo Links":
-        show_demo_links()
+        return
+    
+    # Progress indicator
+    steps = ["📝 Input", "🎯 Selection", "⚙️ Pipeline", "📊 Assessment"]
+    current_idx = ['input', 'difficulty', 'pipeline', 'assessment'].index(st.session_state.current_step) if st.session_state.current_step in ['input', 'difficulty', 'pipeline', 'assessment'] else 0
+    
+    st.sidebar.markdown("### 📍 Progress")
+    for i, step in enumerate(steps):
+        if i == current_idx:
+            st.sidebar.markdown(f"**➤ {step}** ⭐")
+        elif i < current_idx:
+            st.sidebar.markdown(f"✅ {step}")
+        else:
+            st.sidebar.markdown(f"⭕ {step}")
+    
+    # Step 1: Topic Input
+    if st.session_state.current_step == 'input':
+        st.markdown('<div class="step-container">', unsafe_allow_html=True)
+        st.header("📝 Step 1: Enter Assessment Topic")
+        
+        topic = st.text_input(
+            "Domain/Subject:",
+            value=st.session_state.user_topic,
+            placeholder="e.g., Machine Learning - Reinforcement Learning",
+            key="topic_input"
+        )
+        
+        st.session_state.user_topic = topic
+        
+        if st.button("🚀 Start Pipeline Analysis", disabled=not topic.strip(), type="primary"):
+            add_log(f"📊 Starting pipeline for: {topic}")
+            
+            with st.spinner("Analyzing topic and generating difficulty categories..."):
+                simulate_api_call("Generating difficulty categories", (2, 3))
+            
+            add_log("✅ Difficulty categories generated")
+            st.session_state.current_step = 'difficulty'
+            st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Step 2: Difficulty Selection
+    elif st.session_state.current_step == 'difficulty':
+        st.markdown('<div class="step-container">', unsafe_allow_html=True)
+        st.header("🎯 Step 2: Select Difficulty & Subtopic")
+        
+        if st.session_state.user_topic in SAMPLE_DATA:
+            categories = SAMPLE_DATA[st.session_state.user_topic]['difficulty_categories']
+        else:
+            categories = {
+                "Beginner": ["Basic concepts", "Fundamentals", "Introduction"],
+                "Intermediate": ["Applied knowledge", "Problem solving", "Integration"],
+                "Advanced": ["Complex scenarios", "Optimization", "Research-level"]
+            }
+        
+        for difficulty, subtopics in categories.items():
+            st.subheader(f"🎓 {difficulty} Level")
+            cols = st.columns(len(subtopics))
+            
+            for i, subtopic in enumerate(subtopics):
+                with cols[i]:
+                    if st.button(
+                        subtopic, 
+                        key=f"{difficulty}_{subtopic}",
+                        use_container_width=True
+                    ):
+                        st.session_state.selected_difficulty = difficulty
+                        st.session_state.selected_subtopic = subtopic
+                        add_log(f"🎯 Selected: {subtopic} ({difficulty})")
+                        st.session_state.current_step = 'pipeline'
+                        st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Step 3: Pipeline Execution
+    elif st.session_state.current_step == 'pipeline':
+        st.header("⚙️ Step 3: Adversarial Pipeline Execution")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("📊 Pipeline Progress")
+            
+            if not st.session_state.adversarial_attempts:
+                st.info(f"🎯 Running adversarial pipeline for: **{st.session_state.selected_subtopic}** ({st.session_state.selected_difficulty})")
+                
+                if st.button("▶️ Start Adversarial Pipeline", type="primary"):
+                    with st.spinner("Running multi-model adversarial pipeline..."):
+                        run_adversarial_pipeline()
+                    st.rerun()
+            else:
+                # Show adversarial attempts
+                st.subheader("🔄 Live Adversarial Loop")
+                for attempt in st.session_state.adversarial_attempts:
+                    with st.container():
+                        cols = st.columns([1, 2, 2, 1])
+                        
+                        with cols[0]:
+                            status_color = "🟢" if attempt['status'] == 'success' else "🔴" if attempt['status'] == 'failed' else "🟡"
+                            st.write(f"{status_color} **Attempt {attempt['attempt']}**")
+                        
+                        with cols[1]:
+                            st.info(f"🧠 Sonnet: {attempt['sonnet_response']}")
+                        
+                        with cols[2]:
+                            st.error(f"⚡ Haiku: {attempt['haiku_response']}")
+                        
+                        with cols[3]:
+                            st.write(attempt['status'].upper())
+                
+                if st.button("📊 Continue to Assessment", type="primary"):
+                    st.session_state.current_step = 'assessment'
+                    st.rerun()
+        
+        with col2:
+            st.subheader("📝 Execution Log")
+            log_text = "\n".join(st.session_state.generation_log[-10:])  # Show last 10 entries
+            st.markdown(f'<div class="pipeline-log">{log_text}</div>', unsafe_allow_html=True)
+    
+    # Step 4: Assessment
+    elif st.session_state.current_step == 'assessment':
+        show_assessment()
+    
+    # Sidebar stats
+    if st.session_state.generation_log:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 📈 Session Stats")
+        st.sidebar.metric("Log Entries", len(st.session_state.generation_log))
+        st.sidebar.metric("Adversarial Attempts", len(st.session_state.adversarial_attempts))
+        if st.session_state.selected_errors:
+            st.sidebar.metric("Errors Selected", len(st.session_state.selected_errors))
 
-def show_overview():
-    st.header("📋 Project Overview")
+def show_assessment():
+    """Show the interactive assessment interface"""
+    st.header("📊 Step 4: Interactive Error Detection")
+    
+    if st.session_state.user_topic in SAMPLE_DATA:
+        question_data = SAMPLE_DATA[st.session_state.user_topic]['final_question']
+    else:
+        st.error("No assessment data available for this topic")
+        return
+    
+    st.subheader(question_data['title'])
+    st.write(f"Find conceptual errors in this **{st.session_state.selected_subtopic}** implementation.")
+    st.info("💡 **Instructions**: Click the buttons below the code to select/deselect errors, then evaluate your response!")
+    
+    # Show code
+    st.markdown("### 💻 Code to Review:")
+    st.code(question_data['code'].replace('[ERROR_1]', '').replace('[/ERROR_1]', '')
+                                   .replace('[ERROR_2]', '').replace('[/ERROR_2]', '')
+                                   .replace('[ERROR_3]', '').replace('[/ERROR_3]', ''), language='python')
+    
+    # Error selection interface
+    st.markdown("### 🎯 Select Errors (Click to toggle):")
+    
+    cols = st.columns(len(question_data['errors']))
+    for i, error in enumerate(question_data['errors']):
+        with cols[i]:
+            error_id = error['id']
+            is_selected = error_id in st.session_state.selected_errors
+            
+            button_type = "primary" if is_selected else "secondary"
+            button_text = f"{'✅' if is_selected else '❌'} Error {error_id}"
+            
+            if st.button(button_text, key=f"error_{error_id}", type=button_type, use_container_width=True):
+                if error_id in st.session_state.selected_errors:
+                    st.session_state.selected_errors.remove(error_id)
+                else:
+                    st.session_state.selected_errors.add(error_id)
+                st.rerun()
+            
+            st.caption(error['description'])
+    
+    # Evaluation
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col2:
+        if st.button("📊 Evaluate Response", type="primary", use_container_width=True):
+            evaluate_response(question_data)
+            st.rerun()
+    
+    # Show results
+    if st.session_state.evaluation_results:
+        st.markdown("### 🏆 Evaluation Results")
+        
+        results = st.session_state.evaluation_results
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Precision", f"{results['precision']:.1%}", help="Percentage of selected errors that are actually errors")
+        
+        with col2:
+            st.metric("Recall", f"{results['recall']:.1%}", help="Percentage of actual errors that were found")
+        
+        with col3:
+            st.metric("F1 Score", f"{results['f1']:.1%}", help="Harmonic mean of precision and recall")
+        
+        with col4:
+            st.metric("Selected", f"{len(st.session_state.selected_errors)}", help="Number of errors you selected")
+        
+        # Detailed feedback
+        st.markdown("### 📋 Detailed Feedback")
+        
+        correct_errors = {e['id'] for e in question_data['errors'] if e['correct']}
+        
+        for error in question_data['errors']:
+            error_id = error['id']
+            is_selected = error_id in st.session_state.selected_errors
+            is_correct = error['correct']
+            
+            if is_selected and is_correct:
+                st.success(f"✅ **Error {error_id}**: Correctly identified! {error['description']}")
+            elif is_selected and not is_correct:
+                st.error(f"❌ **Error {error_id}**: False positive! {error['description']}")
+            elif not is_selected and is_correct:
+                st.warning(f"⚠️ **Error {error_id}**: Missed! {error['description']}")
+            else:
+                st.info(f"✅ **Error {error_id}**: Correctly ignored! {error['description']}")
+    
+    # Reset button
+    st.markdown("---")
+    if st.button("🔄 Start New Assessment", type="secondary"):
+        # Reset session state
+        for key in ['current_step', 'user_topic', 'selected_difficulty', 'selected_subtopic', 
+                   'generation_log', 'adversarial_attempts', 'selected_errors', 'evaluation_results']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun()
+
+def evaluate_response(question_data):
+    """Evaluate the user's error selection"""
+    correct_errors = {e['id'] for e in question_data['errors'] if e['correct']}
+    selected_errors = st.session_state.selected_errors
+    
+    # Calculate metrics
+    if selected_errors:
+        precision = len(selected_errors & correct_errors) / len(selected_errors)
+    else:
+        precision = 0
+    
+    if correct_errors:
+        recall = len(selected_errors & correct_errors) / len(correct_errors)
+    else:
+        recall = 0
+    
+    if precision + recall > 0:
+        f1 = 2 * (precision * recall) / (precision + recall)
+    else:
+        f1 = 0
+    
+    st.session_state.evaluation_results = {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'correct_errors': correct_errors,
+        'selected_errors': selected_errors
+    }
+
+def show_architecture_comparison():
+    """Show architecture comparison page"""
+    st.header("🏗️ Architecture Comparison: Original vs Modular")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("""
-        <div class="architecture-card">
-            <h3>🎯 What This Demonstrates</h3>
-            <ul>
-                <li><strong>Code Modularization</strong>: Transform monolithic code into clean, maintainable modules</li>
-                <li><strong>React Best Practices</strong>: Component composition, custom hooks, separation of concerns</li>
-                <li><strong>Production Architecture</strong>: Scalable patterns for real-world applications</li>
-                <li><strong>ML Pipeline Simulation</strong>: Multi-model adversarial testing workflow</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 📄 Original Monolithic Version
+        
+        **Structure**: Single massive React component
+        - **Size**: 676 lines in one file
+        - **State**: All useState hooks together
+        - **Logic**: All functions inline
+        - **UI**: One giant return statement
+        - **Data**: Hardcoded in component
+        
+        **❌ Challenges**:
+        - Hard to maintain and debug
+        - Difficult to test individual pieces  
+        - No code reusability
+        - Poor collaboration experience
+        - Performance issues with re-renders
+        """)
     
     with col2:
         st.markdown("""
-        <div class="architecture-card">
-            <h3>🔧 Technologies Used</h3>
-            <ul>
-                <li><strong>Frontend</strong>: React 18, Modern Hooks, ES6 Modules</li>
-                <li><strong>Styling</strong>: Tailwind CSS, Responsive Design</li>
-                <li><strong>Architecture</strong>: Component-based, Custom Hooks</li>
-                <li><strong>Deployment</strong>: Static hosting, Streamlit demo</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 📦 Modular Component Architecture
+        
+        **Structure**: 13 focused, reusable modules
+        - **Components**: 9 individual UI components
+        - **Hooks**: 3 custom state management hooks
+        - **Utils**: Separated utility functions
+        - **Constants**: Dedicated configuration file
+        - **Logic**: Clear separation of concerns
+        
+        **✅ Benefits**:
+        - Easy to maintain and extend
+        - Individual components are testable
+        - High code reusability
+        - Great for team collaboration
+        - Optimized performance
+        """)
     
-    # Metrics
-    st.header("📊 Project Metrics")
+    st.markdown("---")
+    st.header("📊 Metrics Comparison")
+    
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <h2 style="color: #EF4444;">1</h2>
-            <p>Original File</p>
-            <small>676 lines</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Original Files", "1", help="Single monolithic component")
     with col2:
-        st.markdown("""
-        <div class="metric-card">
-            <h2 style="color: #10B981;">13</h2>
-            <p>Modular Files</p>
-            <small>Clean separation</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Modular Files", "13", help="Focused, reusable modules")  
     with col3:
-        st.markdown("""
-        <div class="metric-card">
-            <h2 style="color: #3B82F6;">9</h2>
-            <p>UI Components</p>
-            <small>Reusable modules</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.metric("Lines of Code", "676", help="Same functionality, better organized")
     with col4:
-        st.markdown("""
-        <div class="metric-card">
-            <h2 style="color: #8B5CF6;">3</h2>
-            <p>Custom Hooks</p>
-            <small>State management</small>
-        </div>
-        """, unsafe_allow_html=True)
-
-def show_architecture_comparison():
-    st.header("🏗️ Architecture Comparison")
+        st.metric("Reusable Components", "9", help="Can be used across different features")
     
-    col1, col2 = st.columns(2)
+    st.info("💡 **Key Insight**: Both versions have identical functionality, but the modular approach provides significantly better maintainability, testability, and developer experience!")
     
-    with col1:
-        st.markdown("""
-        <div class="architecture-card" style="border-left-color: #EF4444;">
-            <h3 style="color: #EF4444;">📄 Original Version</h3>
-            <div class="code-block">
-                <strong>Structure:</strong> Monolithic component<br>
-                <strong>Lines:</strong> 676 in single file<br>
-                <strong>State:</strong> All useState hooks together<br>
-                <strong>Logic:</strong> All functions inline<br>
-                <strong>UI:</strong> Single massive return statement<br>
-                <strong>Data:</strong> Hardcoded in component<br>
-            </div>
-            
-            <h4>❌ Challenges:</h4>
-            <ul>
-                <li>Hard to maintain and debug</li>
-                <li>Difficult to test individual pieces</li>
-                <li>No code reusability</li>
-                <li>Hard to collaborate on</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="architecture-card" style="border-left-color: #10B981;">
-            <h3 style="color: #10B981;">📦 Modular Version</h3>
-            <div class="code-block">
-                <strong>Structure:</strong> Component-based architecture<br>
-                <strong>Files:</strong> 13 focused modules<br>
-                <strong>State:</strong> Custom hooks for state logic<br>
-                <strong>Logic:</strong> Separated utility functions<br>
-                <strong>UI:</strong> Individual components<br>
-                <strong>Data:</strong> Separate constants file<br>
-            </div>
-            
-            <h4>✅ Benefits:</h4>
-            <ul>
-                <li>Easy to maintain and extend</li>
-                <li>Individual components are testable</li>
-                <li>High code reusability</li>
-                <li>Great for team collaboration</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-
-def show_file_structure():
-    st.header("📁 File Structure & Responsibilities")
-    
-    # Create tabs for different categories
-    tab1, tab2, tab3, tab4 = st.tabs(["🎨 UI Components", "🔧 Logic & State", "📊 Data & Config", "🧪 Testing & Docs"])
-    
-    with tab1:
-        st.markdown("""
-        ### UI Components (9 files)
-        Each component has a single responsibility:
-        """)
-        
-        components = [
-            ("Header.jsx", "Application branding and navigation", "Presentational"),
-            ("TopicInput.jsx", "User input for assessment topics", "Interactive"),
-            ("DifficultySelection.jsx", "Choose difficulty and subtopics", "Interactive"),
-            ("GenerationLog.jsx", "Pipeline execution logging", "Data Display"),
-            ("AdversarialAttempts.jsx", "Live attempt visualization", "Data Display"),
-            ("AssessmentQuestion.jsx", "Interactive error detection", "Complex Interactive"),
-            ("ResultsDisplay.jsx", "Performance metrics", "Data Display"),
-            ("AntiCheatAlert.jsx", "Security warnings", "Conditional"),
-            ("Footer.jsx", "Application footer", "Presentational")
-        ]
-        
-        for name, description, type_info in components:
-            st.markdown(f"""
-            <div class="code-block" style="margin: 0.5rem 0;">
-                <strong>{name}</strong> <span style="color: #3B82F6;">({type_info})</span><br>
-                <small style="color: #9CA3AF;">{description}</small>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with tab2:
-        st.markdown("""
-        ### Logic & State Management (3 files)
-        """)
-        
-        logic_files = [
-            ("hooks.js", "Custom React hooks for state management", "3 hooks: usePipelineState, useAdversarialAttempts, useErrorClicks"),
-            ("utils.js", "Pure utility functions", "API calls, evaluation metrics, pipeline orchestration"),
-            ("demo-modular.jsx", "Main component orchestrator", "Combines all modules into working application")
-        ]
-        
-        for name, description, details in logic_files:
-            st.markdown(f"""
-            <div class="code-block" style="margin: 0.5rem 0;">
-                <strong>{name}</strong><br>
-                <em>{description}</em><br>
-                <small style="color: #9CA3AF;">{details}</small>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with tab3:
-        st.markdown("""
-        ### Data & Configuration (1 file)
-        """)
-        
-        st.markdown("""
-        <div class="code-block">
-            <strong>constants.js</strong><br>
-            <em>Centralized configuration and sample data</em><br>
-            <small style="color: #9CA3AF;">Model configurations, API settings, sample pipeline data</small>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with tab4:
-        st.markdown("""
-        ### Documentation & Testing
-        """)
-        
-        docs = [
-            ("README.md", "Project overview and setup instructions"),
-            ("explan.md", "Detailed architecture explanation for data scientists"),
-            ("INSTRUCTIONS.md", "How to run and deploy the demo"),
-            ("test.js", "Basic test setup (framework for future testing)"),
-            ("package.json", "Dependencies and build scripts")
-        ]
-        
-        for name, description in docs:
-            st.markdown(f"""
-            <div class="code-block" style="margin: 0.5rem 0;">
-                <strong>{name}</strong><br>
-                <small style="color: #9CA3AF;">{description}</small>
-            </div>
-            """, unsafe_allow_html=True)
-
-def show_code_examples():
-    st.header("💻 Code Examples")
-    
-    example_type = st.selectbox(
-        "Select Example:",
-        ["Component Structure", "Custom Hooks", "Utility Functions", "State Management"]
-    )
-    
-    if example_type == "Component Structure":
-        st.markdown("### React Component Pattern")
-        st.code("""
-// components/TopicInput.jsx - Clean, focused component
-import React from 'react';
-import { RefreshCw } from 'lucide-react';
-
-const TopicInput = ({ 
-  userTopic,           // Props: clear interface
-  setUserTopic, 
-  isGenerating, 
-  onGenerateDifficulties 
-}) => {
-  return (
-    <div className="bg-gray-800/50 backdrop-blur rounded-lg shadow-xl p-8">
-      <h2 className="text-3xl font-bold mb-6 text-center">Enter Assessment Topic</h2>
-      <div className="max-w-2xl mx-auto">
-        <input
-          type="text"
-          value={userTopic}
-          onChange={(e) => setUserTopic(e.target.value)}
-          placeholder="e.g., Machine Learning - Reinforcement Learning"
-          className="w-full p-4 text-lg bg-gray-700 border border-gray-600 rounded-lg"
-        />
-        <button
-          onClick={() => onGenerateDifficulties(userTopic)}
-          disabled={!userTopic.trim() || isGenerating}
-          className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg"
-        >
-          {isGenerating ? (
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 animate-spin" />
-              Analyzing Topic...
-            </div>
-          ) : (
-            'Start Pipeline Analysis'
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default TopicInput;
-        """, language="javascript")
-        
-        st.markdown("""
-        **Key Features:**
-        - ✅ Single responsibility (handles topic input only)
-        - ✅ Clear props interface (like function parameters)
-        - ✅ No internal state (easier to test and debug)
-        - ✅ Conditional rendering for loading states
-        """)
-    
-    elif example_type == "Custom Hooks":
-        st.markdown("### Custom Hooks for State Logic")
-        st.code("""
-// hooks.js - Reusable state management
-import { useState } from 'react';
-
-export const usePipelineState = () => {
-  const [currentStep, setCurrentStep] = useState('input');
-  const [userTopic, setUserTopic] = useState('');
-  const [finalQuestion, setFinalQuestion] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Return everything the components need
-  return {
-    currentStep, setCurrentStep,
-    userTopic, setUserTopic,
-    finalQuestion, setFinalQuestion,
-    isGenerating, setIsGenerating
-  };
-};
-
-export const useAdversarialAttempts = () => {
-  const [adversarialAttempts, setAdversarialAttempts] = useState([]);
-  const [generationLog, setGenerationLog] = useState([]);
-  
-  const addLog = (message) => {
-    setGenerationLog(prev => [...prev, { 
-      timestamp: new Date().toLocaleTimeString(), 
-      message 
-    }]);
-  };
-  
-  const showAttemptInProgress = (attempt) => {
-    setAdversarialAttempts(prev => [...prev, {
-      attempt,
-      status: 'testing',
-      sonnetResponse: 'Analyzing...',
-      haikuResponse: 'Generating...',
-      timestamp: Date.now()
-    }]);
-  };
-  
-  return {
-    adversarialAttempts,
-    generationLog,
-    addLog,
-    showAttemptInProgress
-  };
-};
-        """, language="javascript")
-        
-        st.markdown("""
-        **Benefits:**
-        - 🔄 **Reusable**: Can be used in multiple components
-        - 🧪 **Testable**: Logic is separated from UI
-        - 📦 **Encapsulated**: Related state and functions grouped together
-        - 🔍 **Debuggable**: Easier to track state changes
-        """)
-    
-    elif example_type == "Utility Functions":
-        st.markdown("### Pure Utility Functions")
-        st.code("""
-// utils.js - Pure functions (no side effects)
-export const evaluateResponse = (finalQuestion, clicks) => {
-  if (!finalQuestion) return null;
-
-  const correctErrors = new Set(
-    finalQuestion.errors
-      .filter(e => e.severity !== 'trick')
-      .map(e => e.id)
-  );
-  const selectedErrors = new Set(clicks);
-
-  // Calculate familiar ML metrics
-  const intersection = new Set([...selectedErrors].filter(x => correctErrors.has(x)));
-  const precision = selectedErrors.size > 0 ? intersection.size / selectedErrors.size : 0;
-  const recall = correctErrors.size > 0 ? intersection.size / correctErrors.size : 0;
-  const f1 = precision + recall > 0 ? 2 * (precision * recall) / (precision + recall) : 0;
-  
-  return { precision, recall, f1 };
-};
-
-export const makeAPICall = async (model, prompt, operation, addLog) => {
-  addLog(`🧠 ${operation} with ${model}...`);
-  
-  // Simulate API call for demo
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-  
-  if (operation.includes("Sonnet") && Math.random() < 0.1) {
-    throw new Error("Model differentiation failed - retry needed");
-  }
-  
-  return "Sample API response for demo";
-};
-        """, language="javascript")
-        
-        st.markdown("""
-        **Pure Function Benefits:**
-        - ✅ **Predictable**: Same input always produces same output
-        - ✅ **Testable**: Easy to unit test with different inputs
-        - ✅ **Reusable**: Can be used anywhere in the application
-        - ✅ **Side-effect free**: Don't modify external state
-        """)
-
-def show_demo_links():
-    st.header("🚀 Live Demo Links")
-    
-    st.markdown("""
-    ### 🌐 Local Development Server
-    Your demo is currently running locally. Access it at:
-    """)
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="architecture-card">
-            <h4>💻 Computer Access</h4>
-            <code>http://localhost:8080/test.html</code>
-            
-            <h4>📱 Mobile Access (Same WiFi)</h4>
-            <code>http://192.168.11.150:8080/test.html</code>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="architecture-card">
-            <h4>✨ Features Available</h4>
-            <ul>
-                <li>Toggle between Original/Architecture views</li>
-                <li>Interactive demo simulation</li>
-                <li>No API keys required</li>
-                <li>Mobile-responsive design</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    ### 🚀 Deployment Options
-    
-    **GitHub Pages** (Static hosting)
-    - Free hosting for public repos
-    - Automatic deployments from main branch
-    - Perfect for frontend demos
-    
-    **Vercel/Netlify** (Modern hosting)
-    - Instant deployments from Git
-    - Custom domains available
-    - Optimized for React applications
-    
-    **Streamlit Cloud** (This demo!)
-    - Great for data science projects
-    - Easy Python-based deployments
-    - Perfect for showcasing architecture
-    """)
-    
-    st.info("💡 **Tip**: For production deployment, consider using Vercel or Netlify for the React demo, and keep this Streamlit app for documentation and architecture explanation!")
+    if st.button("🚀 Try Interactive Demo", type="primary"):
+        st.session_state.current_step = 'input'
+        st.rerun()
 
 if __name__ == "__main__":
     main()
