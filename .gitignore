@@ -1,17 +1,29 @@
 # Dependencies
 node_modules/
 package-lock.json
+streamlit-env/
 
 # Build outputs
 dist/
 build/
 
-# Environment variables
+# Environment variables - AWS/Bedrock credentials
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.streamlit/secrets.toml
+
+# AWS credentials (multiple possible locations)
+.aws/credentials
+.aws/config
+aws_credentials.txt
+bedrock_keys.txt
+anthropic_keys.txt
+
+# Streamlit secrets
+secrets.toml
 
 # IDE
 .vscode/
@@ -32,3 +44,8 @@ yarn-error.log*
 *.pid
 *.seed
 *.pid.lock
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

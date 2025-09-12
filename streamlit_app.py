@@ -4,6 +4,14 @@ import random
 from datetime import datetime
 import json
 
+# Import Bedrock integration
+try:
+    from bedrock_utils import get_bedrock_client, test_bedrock_connection, generate_difficulty_categories, generate_adversarial_question
+    BEDROCK_AVAILABLE = True
+except ImportError as e:
+    st.warning(f"Bedrock integration not available: {e}")
+    BEDROCK_AVAILABLE = False
+
 # Page config
 st.set_page_config(
     page_title="Aqumen.ai Demo - Interactive Streamlit Version",
@@ -247,6 +255,16 @@ def main():
     # Header
     st.markdown('<h1 class="main-header">🧠 Aqumen.ai Interactive Demo</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #9CA3AF;">Multi-Model Adversarial Pipeline for Intelligent Error Detection</p>', unsafe_allow_html=True)
+    
+    # Bedrock connection status
+    if BEDROCK_AVAILABLE:
+        connection_status = test_bedrock_connection()
+        if connection_status:
+            st.success("🚀 **LIVE MODE**: Connected to AWS Bedrock - Using real Claude models!")
+        else:
+            st.warning("⚡ **DEMO MODE**: Bedrock configured but not connected - Using simulations")
+    else:
+        st.info("📝 **DEMO MODE**: Using simulated API calls - Configure Bedrock for live models")
     
     # Sidebar navigation
     st.sidebar.title("🎯 Demo Navigation")
