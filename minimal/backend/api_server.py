@@ -1,0 +1,412 @@
+"""
+FastAPI server for dynamic adversarial question generation with SSE streaming.
+
+This API provides real-time streaming of the 7-step pipeline execution,
+allowing clients to see each step complete as it happens.
+
+Endpoints:
+- GET  /health                    Health check
+- GET  /api/models                Get model information
+- GET  /api/generate-stream       Stream pipeline execution (SSE)
+- POST /api/generate              Generate question (blocking, returns final result)
+"""
+
+import json
+import asyncio
+from datetime import datetime
+from typing import Optional, AsyncGenerator
+import logging
+
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+
+from corrected_7step_pipeline import CorrectedSevenStepPipeline
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="Aqumen Question Generation API",
+    description="Real-time adversarial AI/ML code review question generation",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# CORS configuration - allow frontend domains
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",           # Vite dev server
+        "http://localhost:3000",           # Alternative dev port
+        "http://localhost:8501",           # Streamlit local
+        "https://demo.aqumen.ai",          # Production React frontend
+        "https://dev.aqumen.ai",           # Dev Streamlit frontend
+        "https://*.vercel.app",            # Vercel preview deployments
+        "https://*.streamlit.app",         # Streamlit Cloud
+        "https://*.onrender.com",          # Render preview
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Request/Response Models
+class GenerateRequest(BaseModel):
+    topic: str = Field(..., description="AI/ML topic for question generation", min_length=3, max_length=200)
+    difficulty_preference: Optional[str] = Field(None, description="Preferred difficulty: Beginner, Intermediate, Advanced, Expert")
+    max_retries: int = Field(3, description="Maximum retries if question isn't hard enough", ge=1, le=5)
+
+class QuestionResponse(BaseModel):
+    title: str
+    difficulty: str
+    code: list[str]
+    errors: list[dict]
+    metadata: dict
+
+class HealthResponse(BaseModel):
+    status: str
+    timestamp: str
+    pipeline_ready: bool
+    version: str
+
+# Initialize pipeline (singleton pattern for efficiency)
+pipeline: Optional[CorrectedSevenStepPipeline] = None
+
+def get_pipeline() -> CorrectedSevenStepPipeline:
+    """Lazy initialization of pipeline singleton"""
+    global pipeline
+    if pipeline is None:
+        logger.info("Initializing CorrectedSevenStepPipeline...")
+        try:
+            pipeline = CorrectedSevenStepPipeline()
+            logger.info("Pipeline initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize pipeline: {e}")
+            raise HTTPException(500, "Failed to initialize pipeline")
+    return pipeline
+
+@app.on_event("startup")
+async def startup_event():
+    """Pre-initialize pipeline on server startup"""
+    logger.info("Server starting up...")
+    try:
+        get_pipeline()
+        logger.info("Server ready to accept requests")
+    except Exception as e:
+        logger.error(f"Startup failed: {e}")
+
+@app.get("/", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """
+    Health check endpoint.
+
+    Returns service status and pipeline readiness.
+    """
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.now().isoformat(),
+        pipeline_ready=pipeline is not None,
+        version="1.0.0"
+    )
+
+@app.get("/api/models")
+async def get_models():
+    """
+    Get information about the models used in the pipeline.
+
+    Returns model IDs and descriptions for all three tiers.
+    """
+    try:
+        p = get_pipeline()
+        return {
+            "models": {
+                "strong": {
+                    "id": p.model_opus,
+                    "description": "Claude Sonnet 4.5 - Used for judge, question generation, and Step 7 (with thinking mode on retries)",
+                    "purpose": "Strategic reasoning, quality assessment"
+                },
+                "mid": {
+                    "id": p.model_sonnet,
+                    "description": "Claude Sonnet 4 - Should succeed at the question",
+                    "purpose": "Competent implementation baseline"
+                },
+                "weak": {
+                    "id": p.model_haiku,
+                    "description": "Claude Haiku 3 - Target to fail with conceptual errors",
+                    "purpose": "Generate errors for assessment creation"
+                }
+            },
+            "pipeline_flow": "Steps 1-3: Strong → Steps 4-6: Strong+Mid+Weak → Step 7: Strong (with validation)"
+        }
+    except Exception as e:
+        logger.exception("Failed to get model info")
+        raise HTTPException(500, f"Error retrieving model info: {str(e)}")
+
+@app.get("/api/generate-stream")
+async def generate_stream(
+    topic: str = Query(..., description="AI/ML topic for question generation", min_length=3),
+    max_retries: int = Query(3, description="Max retries for hard question", ge=1, le=5)
+):
+    """
+    Stream the 7-step pipeline execution in real-time using Server-Sent Events (SSE).
+
+    This endpoint allows clients to see each step complete as it happens,
+    enabling real-time debugging and progress tracking.
+
+    Each event contains:
+    - step_number: Which step (1-7)
+    - description: What this step does
+    - prompt: The prompt sent to the LLM (for debugging)
+    - response: The LLM's response
+    - success: Whether the step succeeded
+    - timestamp: When the step completed
+    - metadata: Additional info (model used, duration, etc.)
+
+    The stream ends with a "done" event containing the final result.
+    """
+    logger.info(f"Stream request received for topic: {topic}")
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            p = get_pipeline()
+            start_time = datetime.now()
+
+            # Send initial event
+            yield format_sse_message({
+                "event": "start",
+                "topic": topic,
+                "timestamp": start_time.isoformat()
+            }, event_type="start")
+
+            # Run streaming pipeline
+            async for step_data in run_pipeline_streaming(p, topic, max_retries):
+                yield format_sse_message(step_data, event_type="step")
+
+            # Send completion event
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+
+            yield format_sse_message({
+                "event": "done",
+                "timestamp": end_time.isoformat(),
+                "total_duration_seconds": duration
+            }, event_type="done")
+
+        except Exception as e:
+            logger.exception("Error during streaming")
+            yield format_sse_message({
+                "event": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }, event_type="error")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"  # Disable nginx buffering
+        }
+    )
+
+@app.post("/api/generate", response_model=QuestionResponse)
+async def generate_question(request: GenerateRequest):
+    """
+    Generate a complete question (blocking).
+
+    This endpoint runs the full 7-step pipeline and returns only the final result.
+    Use /api/generate-stream for real-time progress updates.
+
+    Returns a validated question ready for the frontend.
+    """
+    logger.info(f"Generate request received for topic: {request.topic}")
+
+    try:
+        start_time = datetime.now()
+        p = get_pipeline()
+
+        # Run full pipeline (blocking)
+        pipeline_result = p.run_full_pipeline(
+            topic=request.topic,
+            max_attempts=request.max_retries
+        )
+
+        if not pipeline_result.final_success:
+            # Extract error details
+            failed_steps = [s for s in pipeline_result.steps_completed if not s.success]
+            error_detail = f"Pipeline failed at step {failed_steps[-1].step_number}" if failed_steps else "Unknown error"
+            logger.error(f"Pipeline failed: {error_detail}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Question generation failed: {error_detail}"
+            )
+
+        # Extract the assessment from Step 7 response
+        step7 = [s for s in pipeline_result.steps_completed if s.step_number == 7]
+        if not step7:
+            logger.error("Step 7 not found in completed steps")
+            raise HTTPException(
+                status_code=500,
+                detail="Assessment creation step not found"
+            )
+
+        # Parse the assessment JSON from Step 7
+        import json as json_module
+        try:
+            assessment = json_module.loads(step7[0].response)
+        except json_module.JSONDecodeError as e:
+            logger.error(f"Failed to parse Step 7 assessment: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to parse generated assessment"
+            )
+
+        # Validate assessment structure
+        if not isinstance(assessment, dict) or 'title' not in assessment:
+            logger.error(f"Invalid assessment format: {assessment}")
+            raise HTTPException(
+                status_code=500,
+                detail="Generated assessment has invalid format"
+            )
+
+        # Add metadata
+        generation_time = (datetime.now() - start_time).total_seconds()
+        assessment['metadata'] = {
+            'generated_at': datetime.now().isoformat(),
+            'generation_time_seconds': round(generation_time, 2),
+            'topic_requested': request.topic,
+            'pipeline_steps': len(pipeline_result.steps_completed),
+            'successful_steps': sum(1 for s in pipeline_result.steps_completed if s.success),
+            'total_attempts': pipeline_result.total_attempts,
+            'differentiation_achieved': pipeline_result.differentiation_achieved
+        }
+
+        logger.info(f"Question generated successfully in {generation_time:.2f}s")
+        return QuestionResponse(**assessment)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error during question generation")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+# Helper functions for SSE
+
+def format_sse_message(data: dict, event_type: str = "message") -> str:
+    """
+    Format a message for Server-Sent Events protocol.
+
+    SSE format:
+    event: <event_type>
+    data: <json_data>
+
+    """
+    json_data = json.dumps(data)
+    return f"event: {event_type}\ndata: {json_data}\n\n"
+
+async def run_pipeline_streaming(
+    pipeline: CorrectedSevenStepPipeline,
+    topic: str,
+    max_retries: int
+) -> AsyncGenerator[dict, None]:
+    """
+    Run the pipeline and yield each step as it completes.
+
+    This wraps the synchronous pipeline generator in an async wrapper
+    to provide real-time streaming updates via SSE.
+    """
+    # Run the pipeline generator in a thread pool to avoid blocking
+    loop = asyncio.get_event_loop()
+
+    # Create iterator from the streaming pipeline
+    def create_generator():
+        """Create the synchronous generator"""
+        return pipeline.run_full_pipeline_streaming(topic, max_attempts=max_retries)
+
+    # Run in executor
+    gen = await loop.run_in_executor(None, create_generator)
+
+    # Iterate through the generator
+    while True:
+        try:
+            # Get next item from generator (in thread pool)
+            item = await loop.run_in_executor(None, lambda: next(gen, None))
+
+            if item is None:
+                # Generator exhausted
+                break
+
+            # Check if this is a final result or a step
+            if isinstance(item, dict) and "final_result" in item:
+                # This is the final result
+                final_result = item["final_result"]
+                assessment = item.get("assessment")
+
+                yield {
+                    "type": "final",
+                    "success": final_result.final_success,
+                    "differentiation_achieved": final_result.differentiation_achieved,
+                    "total_attempts": final_result.total_attempts,
+                    "stopped_at_step": final_result.stopped_at_step,
+                    "assessment": assessment,
+                    "metadata": {
+                        "topic": final_result.topic,
+                        "subtopic": final_result.subtopic,
+                        "difficulty": final_result.difficulty,
+                        "weak_model_failures": final_result.weak_model_failures
+                    }
+                }
+                break
+            else:
+                # This is a PipelineStep object
+                step_data = {
+                    "type": "step",
+                    "step_number": item.step_number,
+                    "description": item.step_name,  # Fixed: step_name not description
+                    "model": item.model_used,  # Fixed: model_used not model
+                    "success": item.success,
+                    "timestamp": item.timestamp,
+                    "response_preview": item.response[:500] if item.response else None,
+                    "response_full": item.response,  # Full response for debugging
+                }
+
+                yield step_data
+
+        except StopIteration:
+            # Generator finished
+            break
+        except Exception as e:
+            logger.exception("Error in streaming pipeline")
+            yield {
+                "type": "error",
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+            break
+
+if __name__ == "__main__":
+    import uvicorn
+
+    # Run server
+    # For development: uvicorn api_server:app --reload --port 8000
+    # For production: configured via Render
+    uvicorn.run(
+        "api_server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # Auto-reload on code changes (dev only)
+        log_level="info"
+    )
