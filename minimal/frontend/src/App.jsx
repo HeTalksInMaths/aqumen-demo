@@ -96,7 +96,7 @@ const App = () => {
       model: "claude-opus-4",
       timestamp: "2025-10-09T10:30:28.567Z",
       success: true,
-      response_full: `{
+      response_full: JSON.stringify({
   "domain": "Group-relative normalization in RLHF",
   "difficulty": "Expert",
   "errors": [
@@ -128,7 +128,7 @@ const App = () => {
       "common_in": "intermediate practitioners"
     }
   ]
-}`
+})
     },
     {
       _id: "grpo-step-3",
