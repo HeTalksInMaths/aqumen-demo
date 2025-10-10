@@ -1,0 +1,13 @@
+{
+  "name": "aqumen-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd minimal/frontend && npm install && npm run build",
+    "dev": "cd minimal/frontend && npm run dev",
+    "preview": "cd minimal/frontend && npm run preview"
+  },
+  "workspaces": [
+    "minimal/frontend"
+  ]
+}
