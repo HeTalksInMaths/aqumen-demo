@@ -71,7 +71,7 @@ const App = () => {
       model: "claude-sonnet-4",
       timestamp: "2025-10-09T10:30:15.234Z",
       success: true,
-      response_full: `{
+      response_full: JSON.stringify({
   "Beginner": {
     "subtopics": ["Policy gradient basics", "Simple advantage estimation", "Basic RL optimization"],
     "skill_level": "Understands policy gradients, can implement vanilla PG",
@@ -87,7 +87,7 @@ const App = () => {
     "skill_level": "Designs novel RL algorithms, handles complex training dynamics",
     "time_to_learn": "2+ years"
   }
-}`
+})
     },
     {
       _id: "grpo-step-2",
@@ -167,7 +167,7 @@ Target errors embedded:
       model: "claude-sonnet-4",
       timestamp: "2025-10-09T10:31:02.456Z",
       success: true,
-      response_full: `{
+      response_full: JSON.stringify({
   "correctness": "Incorrect - Multiple critical errors in GRPO implementation",
   "main_issues": [
     "Line 6: Normalizing advantages globally defeats the purpose of GRPO. Must normalize within groups using group_ids.",
@@ -181,7 +181,7 @@ Target errors embedded:
     "Fix KL: kl = (exp(ref_logprobs) * (ref_logprobs - policy_logprobs)).sum()"
   ],
   "expertise_level": "Expert - caught all 3 subtle GRPO implementation errors"
-}`
+})
     },
     {
       _id: "grpo-step-5",
@@ -190,7 +190,7 @@ Target errors embedded:
       model: "claude-haiku-4",
       timestamp: "2025-10-09T10:31:18.789Z",
       success: true,
-      response_full: `{
+      response_full: JSON.stringify({
   "correctness": "Looks correct - implements GRPO loss function properly",
   "main_issues": [
     "KL penalty coefficient 0.1 might need tuning based on task",
@@ -203,7 +203,7 @@ Target errors embedded:
     "Add logging for advantage statistics to monitor training"
   ],
   "expertise_level": "Intermediate - understands GRPO basics but missed the subtle errors"
-}`
+})
     },
     {
       _id: "grpo-step-6",
@@ -212,7 +212,7 @@ Target errors embedded:
       model: "claude-opus-4",
       timestamp: "2025-10-09T10:31:35.234Z",
       success: true,
-      response_full: `{
+      response_full: JSON.stringify({
   "sonnet_analysis": {
     "correct": true,
     "identified_all_errors": true,
@@ -237,7 +237,7 @@ Target errors embedded:
   },
   "overall_success": true,
   "confidence": 0.93
-}`
+})
     },
     {
       _id: "grpo-step-7",
