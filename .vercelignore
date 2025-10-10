@@ -1,0 +1,20 @@
+# Ignore old root files if they accidentally get committed again
+demo-modular.jsx
+demo.jsx
+constants.js
+bedrock_utils.py
+
+# Ignore duplicate frontend directories
+frontend-dev/
+frontend-main/
+frontend-main-branch/
+
+# Ignore session logs
+*.jsonl
+
+# Ignore backend tests and temp files
+backend/test_*.py
+backend/check_*.py
+backend/*_test.py
+backend/*.json
+backend/agentic_*.txt
