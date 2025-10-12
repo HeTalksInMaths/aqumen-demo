@@ -11,7 +11,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
  * @param {number} maxRetries - Maximum retry attempts for differentiation
  * @returns {Promise<Object>} - Question in React format
  */
-export const fetchQuestionBlocking = async (topic, maxRetries = 3) => {
+export const fetchQuestionBlocking = async (
+  topic,
+  maxRetries = 3,
+  { selectedDifficulty, selectedSubtopic } = {}
+) => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/generate`, {
       method: 'POST',
@@ -21,7 +25,9 @@ export const fetchQuestionBlocking = async (topic, maxRetries = 3) => {
       },
       body: JSON.stringify({
         topic,
-        max_retries: maxRetries
+        max_retries: maxRetries,
+        selected_difficulty: selectedDifficulty,
+        selected_subtopic: selectedSubtopic
       })
     });
 
@@ -52,8 +58,28 @@ export const fetchQuestionBlocking = async (topic, maxRetries = 3) => {
  * @param {Function} onError - Callback for errors (error) => void
  * @returns {Function} - Cleanup function to close the connection
  */
-export const fetchQuestionStreaming = (topic, maxRetries, onStepUpdate, onComplete, onError) => {
-  const url = `${API_BASE_URL}/api/generate-stream?topic=${encodeURIComponent(topic)}&max_retries=${maxRetries}`;
+export const fetchQuestionStreaming = (
+  topic,
+  maxRetries,
+  onStepUpdate,
+  onComplete,
+  onError,
+  selectedDifficulty,
+  selectedSubtopic
+) => {
+  const params = new URLSearchParams({
+    topic,
+    max_retries: String(maxRetries)
+  });
+
+  if (selectedDifficulty) {
+    params.append('selected_difficulty', selectedDifficulty);
+  }
+  if (selectedSubtopic) {
+    params.append('selected_subtopic', selectedSubtopic);
+  }
+
+  const url = `${API_BASE_URL}/api/generate-stream?${params.toString()}`;
 
   const eventSource = new EventSource(url);
   let completed = false;
@@ -155,5 +181,51 @@ export const checkAPIHealth = async () => {
   } catch (error) {
     console.error('API health check failed:', error);
     return false;
+  }
+};
+
+/**
+ * Fetch all pipeline prompts from the backend
+ * @returns {Promise<Object>} - Object containing all step prompts
+ */
+export const fetchPrompts = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/get-prompts`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch prompts: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.prompts;
+  } catch (error) {
+    console.error('Failed to fetch prompts:', error);
+    throw error;
+  }
+};
+
+export const fetchStep1Categories = async (topic) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/step1`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ topic })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Failed to run Step 1: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch Step 1 categories:', error);
+    throw error;
   }
 };
