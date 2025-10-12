@@ -13,9 +13,11 @@ Endpoints:
 
 import json
 import asyncio
-from datetime import datetime
-from typing import Optional, AsyncGenerator
 import logging
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +25,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
+from config import load_prompts
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +33,13 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Toggle lightweight "mock" mode for local development/testing so we can satisfy
+# frontend calls without initializing the full Bedrock-powered pipeline.
+MOCK_PIPELINE = os.getenv("AQU_MOCK_PIPELINE", "0") == "1"
+if MOCK_PIPELINE:
+    logger.warning("AQU_MOCK_PIPELINE=1 detected – running API server in mock mode; "
+                   "pipeline-dependent endpoints will return placeholders.")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -83,6 +93,8 @@ pipeline: Optional[CorrectedSevenStepPipeline] = None
 def get_pipeline() -> CorrectedSevenStepPipeline:
     """Lazy initialization of pipeline singleton"""
     global pipeline
+    if MOCK_PIPELINE:
+        raise HTTPException(503, "Pipeline is disabled in mock mode.")
     if pipeline is None:
         logger.info("Initializing CorrectedSevenStepPipeline...")
         try:
@@ -97,6 +109,9 @@ def get_pipeline() -> CorrectedSevenStepPipeline:
 async def startup_event():
     """Pre-initialize pipeline on server startup"""
     logger.info("Server starting up...")
+    if MOCK_PIPELINE:
+        logger.info("Mock mode enabled – skipping pipeline initialization.")
+        return
     try:
         get_pipeline()
         logger.info("Server ready to accept requests")
@@ -114,7 +129,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        pipeline_ready=pipeline is not None,
+        pipeline_ready=(pipeline is not None and not MOCK_PIPELINE),
         version="1.0.0"
     )
 
@@ -125,6 +140,28 @@ async def get_models():
 
     Returns model IDs and descriptions for all three tiers.
     """
+    if MOCK_PIPELINE:
+        logger.debug("Mock mode: returning placeholder model metadata.")
+        return {
+            "models": {
+                "strong": {
+                    "id": "mock-strong-model",
+                    "description": "Static strong reviewer model (mock mode)",
+                    "purpose": "Strategic reasoning, quality assessment"
+                },
+                "mid": {
+                    "id": "mock-mid-model",
+                    "description": "Static mid reviewer model (mock mode)",
+                    "purpose": "Baseline implementation"
+                },
+                "weak": {
+                    "id": "mock-weak-model",
+                    "description": "Static weak reviewer model (mock mode)",
+                    "purpose": "Simulated weak performance"
+                }
+            },
+            "pipeline_flow": "Mock mode – pipeline execution disabled."
+        }
     try:
         p = get_pipeline()
         return {
@@ -302,6 +339,144 @@ async def generate_question(request: GenerateRequest):
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+@app.post("/api/update-prompt")
+async def update_prompt(request: dict):
+    """
+    Update a prompt override stored in prompts_changes.json.
+
+    Request body:
+    {
+        "step": "step1_difficulty_categories" | "step2_error_catalog" | ... | "step7_student_assessment",
+        "new_prompt": "The new prompt template string"
+    }
+    """
+    import json as json_module
+
+    step = request.get("step")
+    new_prompt = request.get("new_prompt")
+
+    if not step or not new_prompt:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required fields: 'step' and 'new_prompt'"
+        )
+
+    valid_steps = [
+        "step1_difficulty_categories",
+        "step2_error_catalog",
+        "step3_strategic_question",
+        "step4_test_sonnet",
+        "step5_test_haiku",
+        "step6_judge_responses",
+        "step7_student_assessment"
+    ]
+
+    if step not in valid_steps:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid step. Must be one of: {', '.join(valid_steps)}"
+        )
+
+    try:
+        prompts = load_prompts()
+        if step not in prompts:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Step '{step}' not found in prompt configuration"
+            )
+
+        changes_path = Path(__file__).resolve().parent / "prompts_changes.json"
+        now_iso = datetime.now().isoformat()
+
+        try:
+            if changes_path.exists():
+                with changes_path.open("r", encoding="utf-8") as fh:
+                    prompt_changes = json_module.load(fh)
+                    if not isinstance(prompt_changes, dict):
+                        prompt_changes = {}
+            else:
+                prompt_changes = {}
+        except json_module.JSONDecodeError as exc:
+            logger.exception("Invalid JSON in prompts_changes.json")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Invalid JSON in prompts_changes.json: {exc}"
+            ) from exc
+
+        meta = prompt_changes.get("_meta")
+        if not isinstance(meta, dict):
+            meta = {
+                "description": "UI-managed prompt overrides merged on top of prompts.json."
+            }
+        meta["last_updated"] = now_iso
+        prompt_changes["_meta"] = meta
+
+        override_entry = prompt_changes.get(step)
+        if not isinstance(override_entry, dict):
+            override_entry = {}
+
+        override_entry.update({
+            "template": new_prompt,
+            "last_updated": now_iso,
+            "updated_by": "api"
+        })
+        prompt_changes[step] = override_entry
+
+        with changes_path.open("w", encoding="utf-8") as fh:
+            json_module.dump(prompt_changes, fh, indent=2)
+
+        merged_prompts = load_prompts()
+        updated_prompt = merged_prompts.get(step, {})
+
+        logger.info(f"Prompt override saved for step: {step}")
+
+        return {
+            "success": True,
+            "step": step,
+            "updated_prompt": updated_prompt,
+            "message": "Prompt override saved to prompts_changes.json. Reload the pipeline to pick up changes."
+        }
+
+    except HTTPException:
+        raise
+    except FileNotFoundError as exc:
+        logger.exception("Prompt configuration missing")
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Error updating prompt")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update prompt: {exc}"
+        ) from exc
+
+
+@app.get("/api/get-prompts")
+async def get_prompts():
+    """
+    Get the merged prompt configuration (base + overrides).
+    """
+    try:
+        prompts = load_prompts()
+        logger.info("Prompts retrieved successfully")
+        return {
+            "success": True,
+            "prompts": prompts
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc)
+        ) from exc
+    except Exception as exc:
+        logger.exception("Error retrieving prompts")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve prompts: {exc}"
+        ) from exc
 
 # Helper functions for SSE
 

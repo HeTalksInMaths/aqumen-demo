@@ -4,11 +4,14 @@ Handles real API calls to replace the simulated ones
 """
 
 import boto3
-import json
-import streamlit as st
-from typing import Optional, Dict, Any
+import logging
 import time
 import random
+import json
+import streamlit as st
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class BedrockClient:
     def __init__(self):
@@ -97,7 +100,7 @@ class BedrockClient:
                 return "No response generated"
                 
         except Exception as e:
-            st.warning(f"Bedrock API error for {operation}: {str(e)}")
+            logger.warning(f"Bedrock API error for {operation}: {str(e)}")
             # Fallback to simulation on error
             return self._simulate_api_call(operation)
     
@@ -127,8 +130,6 @@ def generate_difficulty_categories(topic: str) -> Dict[str, list]:
     """
     Generate difficulty categories using Claude Opus
     """
-    client = get_bedrock_client()
-    
     prompt = f"""For the topic "{topic}", create exactly 3 difficulty levels with specific subtopic examples.
 
 Focus on creating a progression from basic concepts to advanced domain-specific knowledge.
@@ -141,14 +142,15 @@ Return only a JSON object in this exact format:
   "Advanced": ["subtopic1", "subtopic2", "subtopic3"]
 }}"""
 
+    client = get_bedrock_client()
     if client.is_available():
         try:
             response = client.make_api_call('STRONG', prompt, f"Difficulty categories for {topic}")
             # Parse JSON response
             import json
             return json.loads(response)
-        except:
-            pass
+        except Exception as exc:
+            logger.warning("Difficulty generation fallback due to error: %s", exc)
     
     # Fallback data if API fails
     from constants import samplePipelineData
@@ -165,48 +167,6 @@ def generate_adversarial_question(topic: str, difficulty: str, subtopic: str) ->
     """
     Generate an adversarial question using the multi-model pipeline
     """
-    client = get_bedrock_client()
-    
-    # Step 1: Generate error catalog with Opus
-    error_prompt = f"""For the topic "{topic}" at {difficulty} level, specifically "{subtopic}", identify 3-5 common conceptual errors that students make. Focus on domain-specific mistakes that reveal understanding gaps.
-
-Return a JSON array of error objects with this format:
-[
-  {{
-    "id": "error_name",
-    "description": "What the error is",
-    "likelihood": 0.8,
-    "domain_specific": true
-  }}
-]"""
-    
-    # Step 2: Generate question with embedded errors using Opus  
-    question_prompt = f"""Create a code-based assessment question for "{subtopic}" ({difficulty} level) that contains exactly 3 errors that students can click to identify.
-
-The question should test understanding of {topic} concepts and include both real errors and trick questions (code that looks wrong but is actually correct).
-
-Return JSON format:
-{{
-  "title": "Question title",
-  "code": "Code with [ERROR_1]highlighted sections[/ERROR_1] marking potential errors",
-  "errors": [
-    {{
-      "id": 1,
-      "description": "What's wrong with this code",
-      "severity": "high",
-      "correct": true
-    }}
-  ]
-}}"""
-    
-    if client.is_available():
-        try:
-            # Use the real API for question generation
-            response = client.make_api_call('STRONG', question_prompt, f"Adversarial question for {subtopic}")
-            import json
-            return json.loads(response)
-        except Exception as e:
-            st.warning(f"API call failed, using fallback: {e}")
     
     # Fallback to sample data
     from constants import samplePipelineData
@@ -223,8 +183,6 @@ def create_student_assessment(topic: str, difficulty: str, subtopic: str, origin
     """
     Generate student assessment question using sophisticated prompts from prompt_improvements.md
     """
-    client = get_bedrock_client()
-    
     domain_reasoning = haiku_response.get('reasoning', 'Domain-specific reasoning not available')
     
     prompt = f"""You are an educational technology expert creating an interactive {subtopic} assessment.
@@ -292,13 +250,14 @@ SPAN TIGHTNESS EXAMPLES:
 - LOOSE: <span>reward + gamma * max_next_q</span> (conceptual expression)
 - AVOID: <span>entire line of code</span>"""
     
+    client = get_bedrock_client()
     if client.is_available():
         try:
             response = client.make_api_call('STRONG', prompt, f"Student assessment for {subtopic}")
             import json
             return json.loads(response)
-        except Exception as e:
-            st.warning(f"API call failed during student assessment creation: {e}")
+        except Exception as exc:
+            logger.warning('Bedrock assessment generation failed, using fallback: %s', exc)
     
     # Fallback data
     return {
@@ -333,13 +292,13 @@ def test_bedrock_connection() -> bool:
         # Simple test call
         response = client.make_api_call('WEAK', 'Say "Hello" in one word.', 'Connection test', max_tokens=10)
         return len(response) > 0
-    except:
+    except Exception as exc:
+        logger.error('Bedrock hello-check failed: %s', exc)
         return False
 
 def generate_domain_expertise_evaluation(topic: str, student_response: str, correct_answer: str) -> Dict[str, Any]:
     """Generate domain expertise evaluation using Claude"""
     client = get_bedrock_client()
-    
     if not client.is_available():
         # Mock response for demo mode
         return {
@@ -376,7 +335,7 @@ Return as structured analysis."""
             "recommendations": ["Study advanced materials", "Work on practical applications"]
         }
         
-    except Exception as e:
+    except Exception:
         # Fallback response
         return {
             "evaluation": f"Analysis completed for {topic} topic",

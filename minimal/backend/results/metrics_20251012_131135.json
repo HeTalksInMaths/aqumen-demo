@@ -1,0 +1,190 @@
+{
+  "run_timestamp": "20251012_131135",
+  "steps": {
+    "1": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "keys_exact",
+          "passed": true,
+          "detail": "found=['Advanced', 'Beginner', 'Intermediate']"
+        },
+        {
+          "name": "count_range",
+          "passed": true,
+          "detail": "counts=[5, 5, 5]"
+        },
+        {
+          "name": "no_overlaps",
+          "passed": true,
+          "detail": "unique=15 total=15"
+        },
+        {
+          "name": "subtopics_concrete",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "2": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "count_exact_6",
+          "passed": true,
+          "detail": "found=6"
+        },
+        {
+          "name": "schema_fields",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "likelihood_ranges",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "impact_normalized",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "distinct_mistakes",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "match_hint_present",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "3": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "fields_present",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "requirements_count_4_6",
+          "passed": true,
+          "detail": "found=6"
+        },
+        {
+          "name": "artifact_type_valid",
+          "passed": true,
+          "detail": "found=math"
+        },
+        {
+          "name": "no_preembedded_mistakes",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "success_criteria_present",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "4": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "sections_present",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "length_24_120",
+          "passed": true,
+          "detail": "lines=43"
+        },
+        {
+          "name": "coverage_soft>=0.5",
+          "passed": true,
+          "detail": "coverage=1.00"
+        }
+      ]
+    },
+    "5": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "sections_present",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "length_24_120",
+          "passed": true,
+          "detail": "lines=36"
+        },
+        {
+          "name": "coverage_soft>=0.5",
+          "passed": true,
+          "detail": "coverage=1.00"
+        }
+      ]
+    },
+    "6": {
+      "pass_rate": 0.75,
+      "results": [
+        {
+          "name": "schema_core",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "failures_present",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "failures_subset_catalog",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "evidence_in_weak_text",
+          "passed": false,
+          "detail": ""
+        }
+      ]
+    },
+    "7": {
+      "pass_rate": 1.0,
+      "results": [
+        {
+          "name": "line_count_24_60",
+          "passed": true,
+          "detail": "lines=59"
+        },
+        {
+          "name": "error_count_1_5",
+          "passed": true,
+          "detail": "errors=3"
+        },
+        {
+          "name": "spans_match_errors_len",
+          "passed": true,
+          "detail": "spans=3 errors=3"
+        },
+        {
+          "name": "span_lengths_10_120",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "ids_unique",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    }
+  }
+}

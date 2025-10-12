@@ -1,0 +1,30 @@
+{
+  "step1_difficulty_categories": {
+    "description": "Generate difficulty categories for a topic",
+    "template": "For the topic \"{topic}\", return EXACTLY 3 difficulty levels with 3-5 concrete subtopics each.\nUse the keys \"Beginner\", \"Intermediate\", and \"Advanced\" only.\n- Subtopics must be specific implementation tasks (at least two words).\n- Avoid vague items like \"overview\", \"basics\", \"general\", or \"misc\".\nReturn ONLY via difficulty_categories_tool."
+  },
+  "step2_error_catalog": {
+    "description": "Generate conceptual error catalog - patterns that differentiate strong vs weak models",
+    "template": "For the topic \"{topic}\" at {difficulty} level, specifically \"{subtopic}\", return EXACTLY 6 subtle, conceptually distinct implementation mistakes.\n\nFor each mistake include fields: mistake, why_wrong, match_hint (short cue or regex-like hint), impact (Minor|Moderate|Major), domain_specific=true, likelihood_strong_avoids (0-1), likelihood_weak_makes (0-1).\n- Mistake names must be unique and descriptive (\u2265 4 words, no placeholders).\n- match_hint should help reviewers locate the issue in code or prose (avoid generic words like \"bug\").\n- Focus on domain knowledge gaps; no syntax or formatting nitpicks.\n\nReturn ONLY via error_catalog_tool."
+  },
+  "step3_strategic_question": {
+    "description": "Generate strategic implementation challenge (NO pre-embedded errors)",
+    "template": "Create a strategic challenge for \"{subtopic}\" ({difficulty}) within {topic}.\n\nGuidance from catalog mistakes:\n{catalog_names}\n{failure_feedback}\n\nRules:\n- Choose artifact_type from: code, prose, math, email, table, diagram, plan, pseudo, query, other.\n- Do NOT pre-embed mistakes; requirements must naturally surface the pitfalls.\n- Include EXACTLY: title, question_text, context, artifact_type, success_criteria, and 4-6 requirements (clear, testable bullet points).\n\nReturn ONLY via strategic_question_tool."
+  },
+  "step4_test_sonnet": {
+    "description": "Test Sonnet (mid-tier) implementation response",
+    "template": "You are an expert in {context}. Produce the requested {artifact}.\n\nTASK: {title}\nDESCRIPTION: {question_text}\nCONTEXT: {context}\n\nREQUIREMENTS (address each explicitly):\n{requirements}\n\nSUCCESS CRITERIA: {success_criteria}\n\nProvide exactly three sections with markdown headers:\n\n### OUTPUT\n<the artifact itself>\n\n### RATIONALE\n2-4 sentences explaining key decisions.\n\n### CONSIDERATIONS\n2-4 bullets covering risks, assumptions, or trade-offs.\n"
+  },
+  "step5_test_haiku": {
+    "description": "Test Haiku (weak-tier) implementation response",
+    "template": "You are an expert in {context}. Produce the requested {artifact}.\n\nTASK: {title}\nDESCRIPTION: {question_text}\nCONTEXT: {context}\n\nREQUIREMENTS (address each explicitly):\n{requirements}\n\nSUCCESS CRITERIA: {success_criteria}\n\nProvide exactly three sections with markdown headers:\n\n### OUTPUT\n<the artifact itself>\n\n### RATIONALE\n2-4 sentences explaining key decisions.\n\n### CONSIDERATIONS\n2-4 bullets covering risks, assumptions, or trade-offs.\n"
+  },
+  "step6_judge_responses": {
+    "description": "Judge if differentiation was achieved by comparing implementations against error catalog",
+    "template": "Evaluate whether the mid-tier model demonstrates stronger domain understanding than the weak-tier model for the task below.\n\nORIGINAL TASK:\n{question_text}\nContext: {context}\nRequirements: {requirements}\n\nKNOWN ERROR PATTERNS (names only):\n{error_patterns_text}\n\nIMPLEMENTATION A (mid-tier):\n{sonnet_response}\n\nIMPLEMENTATION B (weak-tier):\n{haiku_response}\n\nReturn ONLY via judge_decision_tool with:\n- differentiation_achieved (boolean)\n- quality_score (1-10)\n- failures_weaker (strings chosen ONLY from the known error pattern names)\n- reasoning (2-3 sentences explaining the decision)\nOptional: evidence_spans (short quotes) and confidence (0-1). You may include unmapped_findings for telemetry; these will not affect Step 7."
+  },
+  "step7_student_assessment": {
+    "description": "Create student assessment with error spans based on actual weak model failures",
+    "template": "You will create a single interactive error-spotting assessment from the weak model's output.\n\nThe weak model (Haiku) made these conceptual errors that the strong model (Sonnet) avoided:\n{haiku_failures}\n\nWEAK MODEL'S BUGGY OUTPUT (use this as your source):\n{haiku_response_preview}\n\nMID-TIER REFERENCE (guidance only, do not copy verbatim):\n{sonnet_response_preview}\n\nYOUR TASK:\nConstruct a self-contained snippet (24-60 lines) and mark each mistake inline with <<error_substring>>.\n\nSTRUCTURE REQUIREMENTS:\n1. Choose content_type from: code, prose, math, email, table, diagram, plan, pseudo, query, other.\n2. Return a content array (one string per line, 24-60 lines total).\n3. Select 1-5 mistakes drawn ONLY from failures_weaker.\n4. Each error id must match exactly the text between << >> and be 10-120 characters long.\n5. Descriptions must be under 150 characters and explain the issue and correction.\n6. Difficulty must be one of: {allowed_difficulties}.\n7. Return ONLY valid JSON via the student_assessment_tool (no prose).\n\nTopic: {topic}\nSubtopic: {subtopic}\n{validation_feedback}\n"
+  }
+}

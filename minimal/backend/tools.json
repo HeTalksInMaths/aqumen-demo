@@ -1,0 +1,272 @@
+{
+  "step1_difficulty_categories": {
+    "name": "difficulty_categories_tool",
+    "description": "Returns difficulty categories with subtopics",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "Beginner": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of beginner-level subtopics"
+        },
+        "Intermediate": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of intermediate-level subtopics"
+        },
+        "Advanced": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of advanced-level subtopics"
+        }
+      },
+      "required": [
+        "Beginner",
+        "Intermediate",
+        "Advanced"
+      ]
+    }
+  },
+  "step6_judge_responses": {
+    "name": "judge_decision_tool",
+    "description": "Returns differentiation decision and mapped weak-model failures",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "differentiation_achieved": {
+          "type": "boolean"
+        },
+        "quality_score": {
+          "type": "number"
+        },
+        "failures_weaker": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Names of mistakes drawn from the provided catalog"
+        },
+        "reasoning": {
+          "type": "string"
+        },
+        "evidence_spans": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Short quotes or snippets supporting the decision"
+        },
+        "confidence": {
+          "type": "number"
+        },
+        "unmapped_findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional observations not mapped to the catalog"
+        }
+      },
+      "required": [
+        "differentiation_achieved",
+        "failures_weaker",
+        "reasoning"
+      ]
+    }
+  },
+  "step2_error_catalog": {
+    "name": "error_catalog_tool",
+    "description": "Returns a structured error catalog with implementation mistakes",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "mistake": {
+                "type": "string"
+              },
+              "why_wrong": {
+                "type": "string"
+              },
+              "match_hint": {
+                "type": "string"
+              },
+              "code_pattern": {
+                "type": "string"
+              },
+              "likelihood_strong_avoids": {
+                "type": "number"
+              },
+              "likelihood_weak_makes": {
+                "type": "number"
+              },
+              "domain_specific": {
+                "type": "boolean"
+              },
+              "impact": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mistake",
+              "why_wrong",
+              "match_hint",
+              "likelihood_strong_avoids",
+              "likelihood_weak_makes",
+              "domain_specific",
+              "impact"
+            ]
+          }
+        }
+      },
+      "required": [
+        "errors"
+      ]
+    }
+  },
+  "step3_strategic_question": {
+    "name": "strategic_question_tool",
+    "description": "Returns a strategic implementation challenge",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Implementation challenge title"
+        },
+        "question_text": {
+          "type": "string",
+          "description": "Clear implementation task description"
+        },
+        "context": {
+          "type": "string",
+          "description": "Realistic business/technical scenario"
+        },
+        "artifact_type": {
+          "type": "string",
+          "enum": [
+            "code",
+            "prose",
+            "math",
+            "email",
+            "table",
+            "diagram",
+            "plan",
+            "pseudo",
+            "query",
+            "other"
+          ],
+          "description": "Type of artifact the model should produce later"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of specific functional requirements"
+        },
+        "success_criteria": {
+          "type": "string",
+          "description": "How to evaluate implementation correctness"
+        }
+      },
+      "required": [
+        "title",
+        "question_text",
+        "context",
+        "artifact_type",
+        "requirements",
+        "success_criteria"
+      ]
+    }
+  },
+  "step7_student_assessment": {
+    "name": "student_assessment_tool",
+    "description": "Returns a code review game question with inline error markup for interactive UI",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Concise, descriptive title describing the implementation (e.g., 'Group-Relative Reward Processing for Multi-Task RL')"
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": [
+            "Beginner",
+            "Intermediate",
+            "Advanced",
+            "Expert"
+          ],
+          "description": "Difficulty level based on domain expertise required"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "code",
+            "prose",
+            "math",
+            "email",
+            "table",
+            "diagram",
+            "plan",
+            "pseudo",
+            "query",
+            "other"
+          ],
+          "description": "Content modality for the assessment"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 24,
+          "maxItems": 60,
+          "description": "Array of lines that form the snippet (one string per line)."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Exact text between << >> delimiters."
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 150,
+                "description": "Concise explanation (under 150 chars) of why it's wrong and what to do instead."
+              }
+            },
+            "required": [
+              "id",
+              "description"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "description": "List of 1-5 conceptual mistakes selected from failures_weaker."
+        }
+      },
+      "required": [
+        "title",
+        "difficulty",
+        "content_type",
+        "content",
+        "errors"
+      ]
+    }
+  }
+}
