@@ -1,51 +1,244 @@
-# Dependencies
-node_modules/
-package-lock.json
-streamlit-env/
+# === PROJECT MANAGEMENT & WORKFLOW FILES ===
+# Personal AI assistant guidelines
+CLAUDE.md
+CLAUDE.local.md
 
-# Build outputs
-dist/
-build/
+# Internal project management
+CLEANUP_ROADMAP.md
+TODO.md
+NOTES.md
+WORKFLOW.md
 
-# Environment variables - AWS/Bedrock credentials
+# Development analysis & scoring (internal use)
+examples/improved_example_evaluations.md
+*_analysis.md
+*_internal.md
+
+# Personal development notes
+*.personal.md
+*.draft.md
+*.temp.md
+dev-notes/
+scratch/
+
+# === ENVIRONMENT & SECRETS ===
+# Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.development
+.env.production
+
+# AWS & API credentials
 .streamlit/secrets.toml
+.aws/
+aws-credentials.json
+api-keys.txt
 
-# AWS credentials (multiple possible locations)
-.aws/credentials
-.aws/config
-aws_credentials.txt
-bedrock_keys.txt
-anthropic_keys.txt
+# Certificate files
+*.pem
+*.key
+*.cert
 
-# Streamlit secrets
-secrets.toml
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+# === DEPENDENCIES & BUILD ARTIFACTS ===
+# Node.js
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.npm
+.yarn/
 
-# Runtime
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+streamlit-env/
+.venv/
+
+# === IDE & EDITOR FILES ===
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# === OS GENERATED FILES ===
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# === LOGS & TEMPORARY FILES ===
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
 *.pid
 *.seed
 *.pid.lock
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# === DEPLOYMENT & CI ===
+# Vercel
+.vercel
+
+# Netlify
+.netlify/
+
+# Local deployment configs
+deploy-local.sh
+*.deploy.local
+
+# === BACKUP & ARCHIVE FILES ===
+# Backup files
+*.bak
+*.backup
+*.old
+*_backup.*
+backup_*/
+
+# Archive files
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# === DATABASE & CACHE ===
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# Cache directories
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+dist/
+
+# === TESTING ===
+# Test output
+.nyc_output/
+test-results/
+coverage/
+
+# === PROJECT SPECIFIC ===
+# Large model files (if any)
+*.model
+*.weights
+models/
+
+# Generated documentation (keep source, ignore built)
+docs/_build/
+site/
+
+# Local configuration overrides
+config.local.json
+settings.local.json
+
+# Performance monitoring
+.clinic/
+.0x/
+
+# === SENSITIVE DATA PATTERNS ===
+# Files that might contain secrets
+*secret*
+*password*
+*credential*
+*token*
+*key*.*
+!public-key.*
+
+# Except for these safe files
+!package-lock.json
+!yarn.lock
+
+# Generated analytics and results
+*.csv
+corrected_7step_results_*.json
+results/metrics_*.json
+
+# Frontend build artifacts and configs
+playwright-report/
+tests/
+**/playwright.config.ts
+**/.eslintignore
+**/.eslintrc.cjs
+
+# Temporary frontend scripts
+**/fix_demo_data.py
