@@ -1,369 +1,262 @@
-import React from 'react';
-import {
-  CheckCircle,
-  XCircle,
-  Eye,
-  EyeOff,
-  Target,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { parseQuestion } from "../utils/parseQuestion.js";
 
-const spanBaseStyle = { whiteSpace: 'pre' };
+const MAX_CLICKS = 3;
+const isWhitespaceOnly = (s) => /^\s*$/.test(s);
 
-const QuestionPlayground = ({
+/** Split a non-error text chunk into runs of whitespace and non-whitespace */
+function splitRuns(text) {
+  const runs = [];
+  let i = 0;
+  while (i < text.length) {
+    const isWS = /\s/.test(text[i]);
+    let j = i + 1;
+    while (j < text.length && /\s/.test(text[j]) === isWS) j++;
+    runs.push({ text: text.slice(i, j), isWhitespace: isWS });
+    i = j;
+  }
+  return runs;
+}
+
+export default function QuestionPlayground({
   currentQuestion,
-  progressPercent,
-  difficultyClass,
-  codeRef,
-  clicks,
-  showResults,
-  currentResult,
-  showSolution,
-  setShowSolution,
-  submitAnswer,
-  nextQuestion,
-  hasMoreQuestions,
-  currentQuestionIndex,
-  totalQuestions,
-  totalScore,
-  handleErrorClick,
-  handleLineClick,
-}) => {
-  const renderCodeWithClickableSpans = () =>
-    currentQuestion.parsedCode.map((line, lineIndex) => {
-      const lineErrors = currentQuestion.errorPositions.filter(
-        (error) => error.line === lineIndex
-      );
+  progressPercent = 0,
+  difficultyClass = "",
+  onSubmit = () => {},
+  onNext = () => {},
+  hasMoreQuestions = false,
+}) {
+  const codeRef = useRef(null);
+  const [clicks, setClicks] = useState([]); // {x,y,line}
+  const [done, setDone] = useState(false);
+  const [showSolution, setShowSolution] = useState(false);
 
-      if (lineErrors.length === 0) {
-        return (
-          <div key={lineIndex} className="relative group" data-line={lineIndex}>
-            <span className="text-gray-500 mr-4 select-none text-right inline-block w-8 text-xs">
-              {lineIndex + 1}
-            </span>
-            <span
-              className="cursor-pointer hover:bg-gray-700 hover:bg-opacity-50 transition-colors rounded px-1"
-              style={spanBaseStyle}
-              onClick={(e) => handleLineClick(e, lineIndex)}
-            >
-              {line || ' '}
-            </span>
-          </div>
-        );
-      }
+  // Measure refs for error substrings → bounding boxes
+  const errRefs = useRef({}); // key -> { el, id }
+  const [callouts, setCallouts] = useState([]); // [{id, top,left,width,height,reason}]
 
-      const sortedErrors = [...lineErrors].sort((a, b) => a.startPos - b.startPos);
+  // Accept pre-parsed question or parse now
+  const parsed = useMemo(() => {
+    if (!currentQuestion) return { parsedCode: [], errorPositions: [], errors: [] };
+    if (currentQuestion.parsedCode && currentQuestion.errorPositions) return currentQuestion;
+    return parseQuestion(currentQuestion);
+  }, [currentQuestion]);
 
+  const reasonById = useMemo(() => {
+    const m = new Map();
+    (currentQuestion?.errors || []).forEach((e) => m.set(e.id, e.description || ""));
+    return m;
+  }, [currentQuestion?.errors]);
+
+  useEffect(() => {
+    // Reset when question changes
+    setClicks([]);
+    setDone(false);
+    setShowSolution(false);
+    setCallouts([]);
+    errRefs.current = {};
+  }, [currentQuestion?.title]);
+
+  // Register a guess: only called from non-whitespace text spans or error spans
+  const registerMissText = (e, line) => {
+    if (done) return;
+    const rect = codeRef.current?.getBoundingClientRect();
+    const x = rect ? e.clientX - rect.left : 0;
+    const y = rect ? e.clientY - rect.top : 0;
+    setClicks((prev) => {
+      const next = [...prev, { x, y, line }];
+      if (next.length >= MAX_CLICKS) { setShowSolution(true); setDone(true); }
+      return next;
+    });
+  };
+
+  const registerHit = (e, line) => {
+    if (done) return;
+    const rect = codeRef.current?.getBoundingClientRect();
+    const x = rect ? e.clientX - rect.left : 0;
+    const y = rect ? e.clientY - rect.top : 0;
+    setClicks((prev) => {
+      const next = [...prev, { x, y, line }];
+      if (next.length >= MAX_CLICKS) { setShowSolution(true); setDone(true); }
+      return next;
+    });
+  };
+
+  // Track refs used for overlay boxes
+  const setErrRef = (key, el, id) => {
+    if (el) errRefs.current[key] = { el, id };
+    else delete errRefs.current[key];
+  };
+
+  const recomputeCallouts = () => {
+    const parent = codeRef.current;
+    if (!parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const boxes = Object.values(errRefs.current)
+      .map(({ el, id }) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {
+          id,
+          top: r.top - parentRect.top + parent.scrollTop,
+          left: r.left - parentRect.left + parent.scrollLeft,
+          width: r.width,
+          height: r.height,
+          reason: reasonById.get(id) || "",
+        };
+      })
+      .filter(Boolean);
+    setCallouts(boxes);
+  };
+
+  useEffect(() => {
+    if (!showSolution) return;
+    const el = codeRef.current;
+    const onScroll = () => recomputeCallouts();
+    const onResize = () => recomputeCallouts();
+    el?.addEventListener("scroll", onScroll);
+    window.addEventListener("resize", onResize);
+    recomputeCallouts();
+    return () => {
+      el?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [showSolution, currentQuestion]);
+
+  // Intersection test: click point vs any callout box
+  const isClickHitAfterReveal = (c) => {
+    for (const b of callouts) {
+      if (c.x >= b.left && c.x <= b.left + b.width && c.y >= b.top && c.y <= b.top + b.height) return true;
+    }
+    return false;
+  };
+
+  // Render code lines with tight, invisible error spans and non-whitespace text-only misses
+  const renderCode = () => {
+    const lines = parsed.parsedCode || [];
+    const positions = parsed.errorPositions || [];
+
+    // Build per-line segments
+    return lines.map((line, lineIndex) => {
+      const lineErrors = positions.filter((e) => e.line === lineIndex).sort((a, b) => a.startPos - b.startPos);
       const segments = [];
-      let lastPos = 0;
-
-      sortedErrors.forEach((error) => {
-        if (error.startPos > lastPos) {
-          segments.push({
-            text: line.substring(lastPos, error.startPos),
-            isError: false,
-            lineIndex,
-          });
-        }
-
-        segments.push({
-          text: error.text,
-          isError: true,
-          errorId: error.id,
-          lineIndex,
-        });
-
-        lastPos = error.endPos;
-      });
-
-      if (lastPos < line.length) {
-        segments.push({
-          text: line.substring(lastPos),
-          isError: false,
-          lineIndex,
-        });
+      let last = 0;
+      for (const err of lineErrors) {
+        if (err.startPos > last) segments.push({ text: line.slice(last, err.startPos), isError: false });
+        segments.push({ text: line.slice(err.startPos, err.endPos), isError: true, id: err.id });
+        last = err.endPos;
       }
+      if (last < line.length) segments.push({ text: line.slice(last), isError: false });
 
       return (
-        <div
-          key={lineIndex}
-          className="relative group"
-          data-line={lineIndex}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              handleLineClick(event, lineIndex);
-            }
-          }}
-        >
-          <span className="text-gray-500 mr-4 select-none text-right inline-block w-8 text-xs">
-            {lineIndex + 1}
-          </span>
-          {segments.map((segment, segIndex) => (
-            <span
-              key={segIndex}
-              className="cursor-pointer transition-all duration-200 rounded px-1 hover:bg-gray-700 hover:bg-opacity-50"
-              style={spanBaseStyle}
-              onClick={(e) =>
-                segment.isError
-                  ? handleErrorClick(e, segment.errorId, segment.lineIndex)
-                  : handleLineClick(e, segment.lineIndex)
+        <div key={lineIndex} className="flex items-start">
+          <span className="text-gray-500 mr-4 select-none text-right inline-block w-8 text-xs">{lineIndex + 1}</span>
+          <span className="select-text">
+            {segments.map((seg, i) => {
+              if (seg.isError) {
+                // ERROR: clickable, invisible; we still attach a ref for measuring boxes
+                return (
+                  <span
+                    key={i}
+                    ref={(el) => setErrRef(`${lineIndex}-${i}`, el, seg.id)}
+                    style={{ whiteSpace: "pre" }}
+                    onClick={(e) => { e.stopPropagation(); registerHit(e, lineIndex); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); registerHit(e, lineIndex); }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {seg.text}
+                  </span>
+                );
               }
-              title={segment.isError ? 'Click to identify this error' : ''}
-            >
-              {segment.text}
-            </span>
-          ))}
+
+              // NON-ERROR: split into runs; whitespace is not clickable
+              const runs = splitRuns(seg.text);
+              return runs.map((r, k) => (
+                <span
+                  key={`${i}-${k}`}
+                  style={{ whiteSpace: "pre" }}
+                  className={r.isWhitespace ? "pointer-events-none" : undefined}
+                  onClick={r.isWhitespace ? undefined : (e) => registerMissText(e, lineIndex)}
+                >
+                  {r.text}
+                </span>
+              ));
+            })}
+          </span>
         </div>
       );
     });
+  };
+
+  // Derived coloring for click markers
+  const clickClass = (c) => {
+    if (!showSolution) return "bg-yellow-300"; // guessing phase
+    return isClickHitAfterReveal(c) ? "bg-emerald-400" : "bg-rose-400";
+  };
 
   return (
-    <>
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden">
-        <div
-          className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${progressPercent}%` }}
-        ></div>
+    <section className="mt-6">
+      <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden" aria-label="Progress">
+        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
       </div>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-semibold text-gray-800">{currentQuestion.title}</h2>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${difficultyClass}`}>
-            {currentQuestion.difficulty}
-          </span>
+      <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-sm leading-7 overflow-auto border relative" ref={codeRef}>
+        <div className="space-y-1">{renderCode()}</div>
+
+        {/* Click markers */}
+        <div className="absolute inset-0 pointer-events-none">
+          {clicks.map((c, idx) => (
+            <div
+              key={idx}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full opacity-90 ${clickClass(c)}`}
+              style={{ left: c.x, top: c.y }}
+              title={!showSolution ? "Guess" : (isClickHitAfterReveal(c) ? "Hit" : "Miss")}
+            />
+          ))}
         </div>
 
-        <div
-          className="bg-gray-900 text-green-400 p-6 rounded-xl font-mono text-sm relative overflow-x-auto border-2 border-gray-700"
-          ref={codeRef}
-          onClick={(event) => {
-            if (showResults || clicks.length >= 3) {
-              return;
-            }
-            const lineElement = event.target.closest('[data-line]');
-            if (lineElement) {
-              return;
-            }
-            handleLineClick(event, 0);
-          }}
-        >
-          <div style={{ lineHeight: '28px' }}>{renderCodeWithClickableSpans()}</div>
-
-          {clicks.map((click) => {
-            const isCorrect = showResults && click.isCorrect;
-            return (
-              <div
-                key={click.id}
-                className={`absolute w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all duration-300 z-10 shadow-lg ${
-                  showResults
-                    ? isCorrect
-                      ? 'bg-green-400 border-green-600 text-white shadow-green-500/50'
-                      : 'bg-red-400 border-red-600 text-white shadow-red-500/50'
-                    : 'bg-yellow-400 border-yellow-600 text-gray-800 shadow-yellow-500/50 animate-pulse'
-                }`}
-                style={{
-                  left: `${click.position.x - 14}px`,
-                  top: `${click.position.y - 14}px`,
-                }}
-              >
-                {clicks.indexOf(click) + 1}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-indigo-700 font-medium">Your Score</span>
-            <CheckCircle className="w-4 h-4 text-indigo-500" />
-          </div>
-          <div className="text-3xl font-bold text-indigo-600">
-            {showResults ? currentResult.score.toFixed(0) : '—'}%
-          </div>
-          <div className="text-xs text-indigo-500 mt-1">
-            {totalQuestions > 0
-              ? `Question ${currentQuestionIndex + 1} of ${totalQuestions}`
-              : 'No questions yet'}
-          </div>
-        </div>
-
-        <div className="bg-emerald-50 rounded-xl border border-emerald-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-emerald-700 font-medium">Correctly Identified</span>
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-          </div>
-          <div className="text-3xl font-bold text-emerald-600">
-            {showResults ? currentResult.correctClicks : '—'}
-          </div>
-          <div className="text-xs text-emerald-500 mt-1">True positives</div>
-        </div>
-
-        <div className="bg-rose-50 rounded-xl border border-rose-100 p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-rose-700 font-medium">Misfires</span>
-            <XCircle className="w-4 h-4 text-rose-500" />
-          </div>
-          <div className="text-3xl font-bold text-rose-600">
-            {showResults ? currentResult.falsePositives : '—'}
-          </div>
-          <div className="text-xs text-rose-500 mt-1">False positives</div>
-        </div>
-      </div>
-
-      {showResults && currentResult && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-lg border shadow-sm p-4">
-            <div className="flex justify-between items-center p-2 bg-white rounded border">
-              <span className="text-sm font-medium text-gray-700">Correct errors:</span>
-              <span className="font-bold text-green-600">{currentResult.correctClicks}</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-white rounded border">
-              <span className="text-sm font-medium text-gray-700">False positives:</span>
-              <span className="font-bold text-red-600 flex items-center gap-1">
-                <XCircle className="w-4 h-4" />
-                {currentResult.falsePositives}
-              </span>
-            </div>
-            {currentResult.falsePositives > 0 && (
-              <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
-                Impact: {currentResult.breakdown.penalty}
-              </div>
-            )}
-            <div className="flex justify-between items-center p-2 bg-white rounded border">
-              <span className="text-sm font-medium text-gray-700">Missed errors:</span>
-              <span className="font-bold text-orange-600">{currentResult.missedErrors}</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border shadow-sm p-4">
-            <div className="text-sm font-medium text-gray-700 mb-2">💡 Pro Tips:</div>
-            <div className="text-xs text-gray-600 space-y-1">
-              {currentResult.score < 70 && (
-                <div>• Look for conceptual errors, not just syntax issues</div>
-              )}
-              {currentResult.falsePositives > 0 && (
-                <div>• Be more selective - only click on actual errors</div>
-              )}
-              {currentResult.missedErrors > 0 && (
-                <div>• Take time to read the code carefully before clicking</div>
-              )}
-              <div>• Focus on logic errors, API misuse, and common pitfalls</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg">
-        <p className="text-amber-800">
-          <strong>🎯 Mission:</strong> Click directly on problematic code segments to identify conceptual
-          errors. You have up to 3 clicks before auto-submission. Look for logic bugs, API misuse, and
-          algorithmic mistakes - not just typos!
-        </p>
-      </div>
-
-      <div className="flex justify-between items-center">
-        <div className="flex gap-3 items-center">
-          <button
-            onClick={() => setShowSolution(!showSolution)}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-600 transition-colors flex items-center gap-2 shadow-md"
-          >
-            {showSolution ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            {showSolution ? 'Hide' : 'Show'} Solution
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-gray-600 font-medium">
-              Clicks: {clicks.length}/3
-            </div>
-            <div className="flex gap-1">
-              {[...Array(3)].map((_, i) => (
+        {/* Reveal overlays (yellow boxes) */}
+        {showSolution && (
+          <div className="absolute inset-0 pointer-events-none">
+            {callouts.map((b, idx) => (
+              <React.Fragment key={`callout-${idx}`}>
                 <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full ${
-                    i < clicks.length ? 'bg-indigo-500' : 'bg-gray-300'
-                  }`}
+                  className="absolute rounded-md border-2 border-yellow-400"
+                  style={{ left: b.left, top: b.top, width: b.width, height: b.height }}
                 />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          {!showResults ? (
-            <button
-              onClick={submitAnswer}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors shadow-md flex items-center gap-2"
-            >
-              <Target className="w-4 h-4" />
-              Submit Answer
-            </button>
-          ) : (
-            <button
-              onClick={nextQuestion}
-              className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors shadow-md flex items-center gap-2"
-            >
-              {hasMoreQuestions ? (
-                <>Next Question →</>
-              ) : (
-                <>View Final Results</>
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {showSolution && (
-        <div className="mt-6 mb-6 bg-blue-50 border border-blue-200 rounded-xl p-6 shadow-md">
-          <div className="flex items-center gap-2 mb-4">
-            <Eye className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-blue-900">Solution: All Errors</h3>
-          </div>
-          <div className="space-y-3">
-            {currentQuestion.errors && currentQuestion.errors.length > 0 ? (
-              currentQuestion.errors.map((error, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-lg border border-blue-200 p-4 shadow-sm"
+                {/* Optional tooltip: uncomment if you want textual reasons */}
+                {/* <div
+                  className="absolute max-w-xs text-slate-900 bg-yellow-50 border border-yellow-300 rounded-lg p-2 text-xs shadow"
+                  style={{ left: b.left + b.width + 8, top: Math.max(4, b.top - 2) }}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-mono text-sm text-red-600 bg-red-50 px-2 py-1 rounded mb-2 inline-block">
-                        {error.id}
-                      </div>
-                      <p className="text-sm text-gray-700">{error.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-sm text-gray-600 italic">No errors defined for this question.</div>
-            )}
+                  <div className="font-semibold mb-0.5">Why</div>
+                  <div>{b.reason}</div>
+                </div> */}
+              </React.Fragment>
+            ))}
           </div>
-        </div>
-      )}
-
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <div className="flex justify-between items-center text-sm text-gray-500">
-          <div>Progress: {Math.round(progressPercent)}% complete</div>
-          <div className="flex items-center gap-4">
-            <span>
-              Avg Score:{' '}
-              {currentQuestionIndex >= 0
-                ? (totalScore / Math.max(1, currentQuestionIndex + (showResults ? 1 : 0))).toFixed(0)
-                : 0}
-              %
-            </span>
-            <span>•</span>
-            <span>Total Points: {totalScore.toFixed(0)}</span>
-          </div>
-        </div>
+        )}
       </div>
-    </>
-  );
-};
 
-export default QuestionPlayground;
+      <div className="mt-3 text-xs text-slate-500">
+        Tip: Click exactly on buggy **text**. Whitespace isn’t clickable. 3 clicks → reveal & lock. After reveal: green = hit, red = miss.
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+          onClick={() => { setShowSolution(true); setDone(true); onSubmit?.(); }}
+          disabled={showSolution}
+        >
+          Show answers
+        </button>
+        {hasMoreQuestions && (
+          <button className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200" onClick={onNext}>Next</button>
+        )}
+      </div>
+    </section>
+  );
+}
