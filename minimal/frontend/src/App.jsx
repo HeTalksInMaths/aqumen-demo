@@ -5,8 +5,8 @@ import PipelinePanel from './components/PipelinePanel';
 import LiveEmptyState from './components/LiveEmptyState';
 import QuestionPlayground from './components/QuestionPlayground';
 import FinalResults from './components/FinalResults';
-import { studentModeQuestions } from './demoData.student.js';
-import { demoAssessments, demoPipelineSteps } from './demoData.dev.js';
+import { studentModeQuestions } from './demoData.student';
+import { demoAssessments, demoPipelineSteps } from './demoData.dev';
 import { pipelineBlueprint, pipelineDemoCopy } from './pipelineBlueprint';
 
 const DemoLoadingScreen = () => (
