@@ -18,6 +18,9 @@ function splitRuns(text) {
   return runs;
 }
 
+const NUDGE_MS = 3000;      // How long the first box’s info button pulses
+const TOOLTIP_WIDTH = 260;  // Approx tooltip max width for placement logic
+
 export default function QuestionPlayground({
   currentQuestion,
   progressPercent = 0,
@@ -30,6 +33,12 @@ export default function QuestionPlayground({
   const [clicks, setClicks] = useState([]); // {x,y,line}
   const [done, setDone] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
+
+  // NEW STATE
+  const [activeTipId, setActiveTipId] = useState(null);   // which explanation is open (hover/focus)
+  const [showAllTips, setShowAllTips] = useState(false);   // expand all explanations
+  const [nudged, setNudged] = useState(false);             // nudge banner shown already
+  const [pulseTargetId, setPulseTargetId] = useState(null);// which box pulses its info button
 
   // Measure refs for error substrings → bounding boxes
   const errRefs = useRef({}); // key -> { el, id }
@@ -55,6 +64,10 @@ export default function QuestionPlayground({
     setShowSolution(false);
     setCallouts([]);
     errRefs.current = {};
+    setActiveTipId(null);
+    setShowAllTips(false);
+    setNudged(false);
+    setPulseTargetId(null);
   }, [currentQuestion?.title]);
 
   // Register a guess: only called from non-whitespace text spans or error spans
@@ -123,6 +136,24 @@ export default function QuestionPlayground({
     };
   }, [showSolution, currentQuestion]);
 
+  useEffect(() => {
+    if (!showSolution || !callouts.length || nudged) return;
+    const firstId = callouts[0]?.id ?? null;
+    setPulseTargetId(firstId);
+    const t = setTimeout(() => { setPulseTargetId(null); setNudged(true); }, NUDGE_MS);
+    return () => clearTimeout(t);
+  }, [showSolution, callouts.length]);
+
+  function tooltipStyleForBox(b) {
+    const el = codeRef.current;
+    const containerW = el?.clientWidth ?? 0;
+    // Prefer to the right; if it overflows, place to the left of the box
+    const preferRightLeft = b.left + b.width + 8 + TOOLTIP_WIDTH <= containerW
+      ? { left: b.left + b.width + 8, top: Math.max(4, b.top - 2) }
+      : { left: Math.max(4, b.left - 8 - TOOLTIP_WIDTH), top: Math.max(4, b.top - 2) };
+    return preferRightLeft;
+  }
+
   // Intersection test: click point vs any callout box
   const isClickHitAfterReveal = (c) => {
     for (const b of callouts) {
@@ -159,6 +190,7 @@ export default function QuestionPlayground({
                   <span
                     key={i}
                     ref={(el) => setErrRef(`${lineIndex}-${i}`, el, seg.id)}
+                    className="cursor-pointer select-none hover:bg-slate-800"
                     style={{ whiteSpace: "pre" }}
                     onClick={(e) => { e.stopPropagation(); registerHit(e, lineIndex); }}
                     onKeyDown={(e) => {
@@ -178,7 +210,7 @@ export default function QuestionPlayground({
                 <span
                   key={`${i}-${k}`}
                   style={{ whiteSpace: "pre" }}
-                  className={r.isWhitespace ? "pointer-events-none" : undefined}
+                  className={r.isWhitespace ? "pointer-events-none" : "cursor-pointer select-none hover:bg-slate-800"}
                   onClick={r.isWhitespace ? undefined : (e) => registerMissText(e, lineIndex)}
                 >
                   {r.text}
@@ -211,32 +243,78 @@ export default function QuestionPlayground({
           {clicks.map((c, idx) => (
             <div
               key={idx}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full opacity-90 ${clickClass(c)}`}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full opacity-70 ${clickClass(c)}`}
               style={{ left: c.x, top: c.y }}
               title={!showSolution ? "Guess" : (isClickHitAfterReveal(c) ? "Hit" : "Miss")}
             />
           ))}
         </div>
 
-        {/* Reveal overlays (yellow boxes) */}
+        {/* === Reveal overlays (boxes + info buttons + tooltips) === */}
         {showSolution && (
           <div className="absolute inset-0 pointer-events-none">
             {callouts.map((b, idx) => (
               <React.Fragment key={`callout-${idx}`}>
+                {/* Yellow outline box */}
                 <div
-                  className="absolute rounded-md border-2 border-yellow-400"
+                  className="absolute rounded-md border-4 border-yellow-400"
                   style={{ left: b.left, top: b.top, width: b.width, height: b.height }}
+                  // Allow hovering anywhere on the box to open the tooltip
+                  onMouseEnter={() => setActiveTipId(b.id)}
+                  onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
                 />
-                {/* Optional tooltip: uncomment if you want textual reasons */}
-                {/* <div
-                  className="absolute max-w-xs text-slate-900 bg-yellow-50 border border-yellow-300 rounded-lg p-2 text-xs shadow"
-                  style={{ left: b.left + b.width + 8, top: Math.max(4, b.top - 2) }}
+
+                {/* Small info button (nudged with pulse on the first box) */}
+                <button
+                  type="button"
+                  className={
+                    "absolute pointer-events-auto inline-flex items-center justify-center w-5 h-5 rounded-full " +
+                    (pulseTargetId === b.id ? "animate-pulse " : "") +
+                    "bg-yellow-400 text-black font-semibold shadow"
+                  }
+                  style={{ left: b.left + b.width - 6, top: b.top - 10 }}
+                  aria-label="Why is this wrong?"
+                  onMouseEnter={() => setActiveTipId(b.id)}
+                  onFocus={() => setActiveTipId(b.id)}
+                  onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                  onBlur={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                  onClick={() => setActiveTipId((id) => (id === b.id ? null : b.id))}
                 >
-                  <div className="font-semibold mb-0.5">Why</div>
-                  <div>{b.reason}</div>
-                </div> */}
+                  i
+                </button>
+
+                {/* Tooltip: single or all */}
+                {(showAllTips || activeTipId === b.id) && (
+                  <div
+                    className="absolute pointer-events-auto max-w-xs text-slate-900 bg-yellow-50 border border-yellow-300 rounded-lg p-2 text-xs shadow"
+                    style={tooltipStyleForBox(b)}
+                    role="dialog"
+                    aria-label="Explanation"
+                  >
+                    <div className="font-semibold mb-0.5">Why</div>
+                    <div>{b.reason}</div>
+                  </div>
+                )}
               </React.Fragment>
             ))}
+
+            {/* Toolbar: show-all toggle (top-right inside code container) */}
+            <div className="absolute right-2 top-2 pointer-events-auto">
+              <button
+                type="button"
+                className="px-2 py-1 rounded-md text-xs bg-yellow-400 text-black shadow hover:bg-yellow-300"
+                onClick={() => setShowAllTips((s) => !s)}
+                aria-pressed={showAllTips}
+              >
+                {showAllTips ? "Hide all explanations" : "Show all explanations"}
+              </button>
+            </div>
+
+            {showSolution && !nudged && !!callouts.length && (
+              <div className="absolute left-3 bottom-3 pointer-events-auto text-[11px] bg-yellow-100 text-yellow-900 border border-yellow-300 rounded px-2 py-1 shadow">
+                Hover the <span className="font-semibold">i</span> to see why these are wrong.
+              </div>
+            )}
           </div>
         )}
       </div>
