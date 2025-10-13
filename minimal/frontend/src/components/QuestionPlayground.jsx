@@ -36,7 +36,6 @@ export default function QuestionPlayground({
 
   // NEW STATE
   const [activeTipId, setActiveTipId] = useState(null);   // which explanation is open (hover/focus)
-  const [showAllTips, setShowAllTips] = useState(false);   // expand all explanations
   const [nudged, setNudged] = useState(false);             // nudge banner shown already
   const [pulseTargetId, setPulseTargetId] = useState(null);// which box pulses its info button
 
@@ -65,7 +64,6 @@ export default function QuestionPlayground({
     setCallouts([]);
     errRefs.current = {};
     setActiveTipId(null);
-    setShowAllTips(false);
     setNudged(false);
     setPulseTargetId(null);
   }, [currentQuestion?.title]);
@@ -111,10 +109,10 @@ export default function QuestionPlayground({
         const r = el.getBoundingClientRect();
         return {
           id,
-          top: r.top - parentRect.top + parent.scrollTop,
+          top: r.top - parentRect.top + parent.scrollTop - 4,
           left: r.left - parentRect.left + parent.scrollLeft,
           width: r.width,
-          height: r.height,
+          height: r.height + 8,
           reason: reasonById.get(id) || "",
         };
       })
@@ -144,15 +142,6 @@ export default function QuestionPlayground({
     return () => clearTimeout(t);
   }, [showSolution, callouts.length]);
 
-  function tooltipStyleForBox(b) {
-    const el = codeRef.current;
-    const containerW = el?.clientWidth ?? 0;
-    // Prefer to the right; if it overflows, place to the left of the box
-    const preferRightLeft = b.left + b.width + 8 + TOOLTIP_WIDTH <= containerW
-      ? { left: b.left + b.width + 8, top: Math.max(4, b.top - 2) }
-      : { left: Math.max(4, b.left - 8 - TOOLTIP_WIDTH), top: Math.max(4, b.top - 2) };
-    return preferRightLeft;
-  }
 
   // Intersection test: click point vs any callout box
   const isClickHitAfterReveal = (c) => {
@@ -190,7 +179,7 @@ export default function QuestionPlayground({
                   <span
                     key={i}
                     ref={(el) => setErrRef(`${lineIndex}-${i}`, el, seg.id)}
-                    className="cursor-pointer select-none hover:bg-slate-800"
+                    className="select-none"
                     style={{ whiteSpace: "pre" }}
                     onClick={(e) => { e.stopPropagation(); registerHit(e, lineIndex); }}
                     onKeyDown={(e) => {
@@ -210,7 +199,7 @@ export default function QuestionPlayground({
                 <span
                   key={`${i}-${k}`}
                   style={{ whiteSpace: "pre" }}
-                  className={r.isWhitespace ? "pointer-events-none" : "cursor-pointer select-none hover:bg-slate-800"}
+                  className={r.isWhitespace ? "pointer-events-none" : "select-none"}
                   onClick={r.isWhitespace ? undefined : (e) => registerMissText(e, lineIndex)}
                 >
                   {r.text}
@@ -235,88 +224,73 @@ export default function QuestionPlayground({
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
       </div>
 
-      <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-sm leading-7 overflow-auto border relative" ref={codeRef}>
-        <div className="space-y-1">{renderCode()}</div>
+      <div className="flex gap-4">
+        <div className="w-2/3">
+          <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-sm leading-7 overflow-auto border relative" ref={codeRef}>
+            <div className="space-y-1">{renderCode()}</div>
 
-        {/* Click markers */}
-        <div className="absolute inset-0 pointer-events-none">
-          {clicks.map((c, idx) => (
-            <div
-              key={idx}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full opacity-70 ${clickClass(c)}`}
-              style={{ left: c.x, top: c.y }}
-              title={!showSolution ? "Guess" : (isClickHitAfterReveal(c) ? "Hit" : "Miss")}
-            />
-          ))}
-        </div>
-
-        {/* === Reveal overlays (boxes + info buttons + tooltips) === */}
-        {showSolution && (
-          <div className="absolute inset-0 pointer-events-none">
-            {callouts.map((b, idx) => (
-              <React.Fragment key={`callout-${idx}`}>
-                {/* Yellow outline box */}
+            {/* Click markers */}
+            <div className="absolute inset-0 pointer-events-none">
+              {clicks.map((c, idx) => (
                 <div
-                  className="absolute rounded-md border-4 border-yellow-400"
-                  style={{ left: b.left, top: b.top, width: b.width, height: b.height }}
-                  // Allow hovering anywhere on the box to open the tooltip
-                  onMouseEnter={() => setActiveTipId(b.id)}
-                  onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                  key={idx}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full opacity-70 ${clickClass(c)}`}
+                  style={{ left: c.x, top: c.y }}
+                  title={!showSolution ? "Guess" : (isClickHitAfterReveal(c) ? "Hit" : "Miss")}
                 />
-
-                {/* Small info button (nudged with pulse on the first box) */}
-                <button
-                  type="button"
-                  className={
-                    "absolute pointer-events-auto inline-flex items-center justify-center w-5 h-5 rounded-full " +
-                    (pulseTargetId === b.id ? "animate-pulse " : "") +
-                    "bg-yellow-400 text-black font-semibold shadow"
-                  }
-                  style={{ left: b.left + b.width - 6, top: b.top - 10 }}
-                  aria-label="Why is this wrong?"
-                  onMouseEnter={() => setActiveTipId(b.id)}
-                  onFocus={() => setActiveTipId(b.id)}
-                  onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
-                  onBlur={() => setActiveTipId((id) => (id === b.id ? null : id))}
-                  onClick={() => setActiveTipId((id) => (id === b.id ? null : b.id))}
-                >
-                  i
-                </button>
-
-                {/* Tooltip: single or all */}
-                {(showAllTips || activeTipId === b.id) && (
-                  <div
-                    className="absolute pointer-events-auto max-w-xs text-slate-900 bg-yellow-50 border border-yellow-300 rounded-lg p-2 text-xs shadow"
-                    style={tooltipStyleForBox(b)}
-                    role="dialog"
-                    aria-label="Explanation"
-                  >
-                    <div className="font-semibold mb-0.5">Why</div>
-                    <div>{b.reason}</div>
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
-
-            {/* Toolbar: show-all toggle (top-right inside code container) */}
-            <div className="absolute right-2 top-2 pointer-events-auto">
-              <button
-                type="button"
-                className="px-2 py-1 rounded-md text-xs bg-yellow-400 text-black shadow hover:bg-yellow-300"
-                onClick={() => setShowAllTips((s) => !s)}
-                aria-pressed={showAllTips}
-              >
-                {showAllTips ? "Hide all explanations" : "Show all explanations"}
-              </button>
+              ))}
             </div>
 
-            {showSolution && !nudged && !!callouts.length && (
-              <div className="absolute left-3 bottom-3 pointer-events-auto text-[11px] bg-yellow-100 text-yellow-900 border border-yellow-300 rounded px-2 py-1 shadow">
-                Hover the <span className="font-semibold">i</span> to see why these are wrong.
+            {/* === Reveal overlays (boxes + info buttons) === */}
+            {showSolution && (
+              <div className="absolute inset-0 pointer-events-none">
+                {callouts.map((b, idx) => (
+                  <React.Fragment key={`callout-${idx}`}>
+                    {/* Yellow outline box */}
+                    <div
+                      className="absolute rounded-md border-4 border-yellow-400"
+                      style={{ left: b.left, top: b.top, width: b.width, height: b.height }}
+                      // Allow hovering anywhere on the box to open the tooltip
+                      onMouseEnter={() => setActiveTipId(b.id)}
+                      onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                    />
+
+                    {/* Small info button (nudged with pulse on the first box) */}
+                    <button
+                      type="button"
+                      className={
+                        "absolute pointer-events-auto inline-flex items-center justify-center w-4 h-4 rounded-full " +
+                        (pulseTargetId === b.id ? "animate-pulse " : "") +
+                        "bg-yellow-400 text-black font-semibold shadow"
+                      }
+                      style={{ left: b.left + b.width - 4, top: b.top - 8 }}
+                      aria-label="Why is this wrong?"
+                      onMouseEnter={() => setActiveTipId(b.id)}
+                      onFocus={() => setActiveTipId(b.id)}
+                      onMouseLeave={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                      onBlur={() => setActiveTipId((id) => (id === b.id ? null : id))}
+                      onClick={() => setActiveTipId((id) => (id === b.id ? null : b.id))}
+                    >
+                      i
+                    </button>
+                  </React.Fragment>
+                ))}
               </div>
             )}
           </div>
-        )}
+        </div>
+        <div className="w-1/3">
+          {showSolution && (
+            <div className="p-4 rounded-2xl bg-slate-100 text-slate-800 text-sm leading-6 h-full">
+              <h3 className="font-bold text-lg mb-2">Explanation</h3>
+              {activeTipId ? (
+                <div>{reasonById.get(activeTipId)}</div>
+              ) : (
+                <div className="text-slate-500">Hover over an info icon to see the explanation.</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 text-xs text-slate-500">
