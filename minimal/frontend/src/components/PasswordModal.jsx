@@ -1,61 +1,73 @@
 import React from 'react';
-import { Lock, X } from 'lucide-react';
 
-const PasswordModal = ({ isOpen, password, setPassword, onSubmit, onCancel, hint = null }) => {
+const PasswordModal = ({
+  isOpen,
+  password,
+  setPassword,
+  onSubmit,
+  onCancel,
+  hint = null,
+}) => {
   if (!isOpen) return null;
 
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      onSubmit();
-    }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') onCancel();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-2xl p-6 max-w-md w-full mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Lock className="w-5 h-5 text-purple-600" />
-            <h2 className="text-xl font-bold text-gray-800">Dev Mode Access</h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dev-mode-title"
+    >
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+        <div className="mb-4">
+          <h2 id="dev-mode-title" className="text-xl font-bold text-gray-800">
+            Dev Mode Access
+          </h2>
+          {hint && <p className="mt-1 text-sm text-gray-600">{hint}</p>}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label
+            htmlFor="dev-password"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Password
+          </label>
+          <input
+            id="dev-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            placeholder="Enter password"
+            autoFocus
+          />
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+            >
+              Unlock
+            </button>
           </div>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {hint && (
-          <p className="text-sm text-gray-600 mb-4">
-            {hint}
-          </p>
-        )}
-
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyPress={handleKeyPress}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent mb-4"
-          autoFocus
-        />
-
-        <div className="flex gap-3">
-          <button
-            onClick={onSubmit}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
-          >
-            Unlock
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-
+        </form>
       </div>
     </div>
   );
