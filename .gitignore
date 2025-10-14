@@ -241,4 +241,4 @@ tests/
 **/.eslintrc.cjs
 
 # Temporary frontend scripts
-**/fix_demo_data.py
+**/fix_demo_data.pyminimal/backend/datasets/

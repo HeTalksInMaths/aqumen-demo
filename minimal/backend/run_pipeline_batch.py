@@ -1,21 +1,8 @@
 import time
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
-def main():
+def main(topics):
     """Run the corrected 7-step pipeline with a batch of topics and track execution time."""
-    topics = [
-        "Prompt Engineering",
-        "LangChain",
-        "ChatGPT API",
-        "Debugging Generative AI",
-        "AI Agents",
-        "Gradio",
-        "Diffusion Models",
-        "Advanced Retrieval (RAG)",
-        "Finetuning LLMs",
-        "Reinforcement Learning (RLHF)"
-    ]
-
     print(f"Starting batch run with {len(topics)} topics...")
 
     start_time = time.time()
@@ -36,5 +23,10 @@ def main():
     print(f"Estimated total cost: ${total_cost:.2f}")
 
 if __name__ == "__main__":
-    main()
+    # This script is now designed to be imported and called from another script.
+    # To run it directly, you would need to provide a list of topics to the main function.
+    # For example:
+    # topics = ["Prompt Engineering", "LangChain"]
+    # main(topics)
+    pass
 

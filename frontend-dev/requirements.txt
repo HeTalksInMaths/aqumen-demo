@@ -1,0 +1,5 @@
+# Streamlit Dev Mode Requirements
+
+streamlit==1.31.0
+requests==2.31.0
+sseclient-py==1.8.0

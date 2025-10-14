@@ -6,6 +6,7 @@ Step 6: Judge compares implementations against error catalog
 Step 7: Creates student assessment based on actual weak model failures
 '''
 
+import subprocess
 import json
 import os
 import random
@@ -1010,6 +1011,11 @@ class CorrectedSevenStepPipeline:
             final_success=False
         )
         self._write_final_result(result)
+
+        # Automatically create new datasets
+        print("\n🔄 Checking for new topics and creating new datasets...")
+        subprocess.run(["python3", "create_new_datasets.py"], cwd=self.script_dir)
+
         return result
 
     def run_full_pipeline_streaming(self, topic: str, max_attempts: int = 3):
