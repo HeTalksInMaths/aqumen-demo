@@ -3,10 +3,15 @@
  * Connects React frontend to FastAPI backend
  */
 
-const API_BASE_URL =
-  (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL) ||
-  process?.env?.VITE_API_URL ||
-  'http://localhost:8000';
+const API_BASE_URL = (() => {
+  if (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof process !== 'undefined' && process?.env?.VITE_API_URL) {
+    return process.env.VITE_API_URL;
+  }
+  return 'http://localhost:8000';
+})();
 
 /**
  * Fetch a question from the pipeline (blocking - waits for complete result)

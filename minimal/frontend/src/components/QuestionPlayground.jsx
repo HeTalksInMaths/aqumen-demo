@@ -33,6 +33,10 @@ export default function QuestionPlayground({
   const [clicks, setClicks] = useState([]); // {x,y,line}
   const [done, setDone] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
+  const difficultyBadgeClass = difficultyClass || "bg-gray-100 text-gray-800";
+  const difficultyLabel = currentQuestion?.difficulty || "Unrated";
+  const topicLabel = currentQuestion?.topic || currentQuestion?.metadata?.topic || "Untitled topic";
+  const titleLabel = currentQuestion?.title || "Code Review Challenge";
 
   // NEW STATE
   const [activeTipId, setActiveTipId] = useState(null);   // which explanation is open (hover/focus)
@@ -209,6 +213,18 @@ export default function QuestionPlayground({
     <section className="mt-6">
       <div className="w-full bg-gray-200 rounded-full h-3 mb-6 overflow-hidden" aria-label="Progress">
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">{titleLabel}</h2>
+          <p className="text-sm text-slate-500">Topic: {topicLabel}</p>
+        </div>
+        <span
+          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide shadow-sm ${difficultyBadgeClass}`}
+        >
+          {difficultyLabel}
+        </span>
       </div>
 
       <div className="p-4 rounded-2xl bg-slate-900 text-slate-100 font-mono text-sm leading-7 overflow-auto border relative" ref={codeRef}>
