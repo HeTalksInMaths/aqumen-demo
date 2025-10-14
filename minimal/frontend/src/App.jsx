@@ -8,6 +8,7 @@ import FinalResults from './components/FinalResults';
 import { studentModeQuestions } from './demoData.student.js';
 import { demoAssessments, demoPipelineSteps } from './demoData.dev.js';
 import { pipelineBlueprint, pipelineDemoCopy } from './pipelineBlueprint';
+import { parseQuestion } from './utils/parseQuestion.js';
 
 const DemoLoadingScreen = () => (
   <div className="flex justify-center items-center h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -20,12 +21,8 @@ const DemoLoadingScreen = () => (
 
 const App = () => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [clicks, setClicks] = useState([]);
-  const [showResults, setShowResults] = useState(false);
   const [gameComplete, setGameComplete] = useState(false);
   const [totalScore, setTotalScore] = useState(0);
-  const [showSolution, setShowSolution] = useState(false);
-  const [currentResult, setCurrentResult] = useState(null);
   const [parsedQuestions, setParsedQuestions] = useState([]);
   const [generationMode, setGenerationMode] = useState('demo');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -82,7 +79,6 @@ const App = () => {
   // Student mode demo questions - imported from demoData.student.js
   const rawQuestions = useMemo(() => studentModeQuestions, []);
 
-  const codeRef = useRef(null);
   const isDevMode = viewMode === 'dev';
 
   useEffect(() => {
@@ -116,11 +112,7 @@ const App = () => {
           const parsed = parseQuestion(demoQuestion);
           setParsedQuestions([parsed]);
           setCurrentQuestion(0);
-          setShowResults(false);
-          setShowSolution(false);
-          setCurrentResult(null);
           setGameComplete(false);
-          setClicks([]);
           setTotalScore(0);
           // Load the corresponding pipeline steps for this assessment
           const assessmentPipelineSteps = demoPipelineSteps.filter(
@@ -146,11 +138,7 @@ const App = () => {
         } else {
           setParsedQuestions([]);
           setCurrentQuestion(0);
-          setShowResults(false);
-          setShowSolution(false);
-          setCurrentResult(null);
           setGameComplete(false);
-          setClicks([]);
           setTotalScore(0);
           setPipelineSteps([]);
           setPipelineFinal(null);
@@ -202,43 +190,6 @@ const App = () => {
     loadPrompts();
   }, []);
 
-  const parseQuestion = (question) => {
-    const parsedLines = [];
-    const errorPositions = [];
-
-    question.code.forEach((line, lineIndex) => {
-      let cleanLine = line;
-      let processedChars = 0;
-
-      const delimiterRegex = /<<([^>]+)>>/g;
-      let match;
-
-      while ((match = delimiterRegex.exec(line)) !== null) {
-        const errorText = match[1];
-        const startPos = match.index - processedChars;
-        const endPos = startPos + errorText.length;
-
-        errorPositions.push({
-          line: lineIndex,
-          startPos,
-          endPos,
-          text: errorText,
-          id: errorText,
-        });
-
-        processedChars += 4;
-      }
-
-      cleanLine = line.replace(/<<([^>]+)>>/g, '$1');
-      parsedLines.push(cleanLine);
-    });
-
-    return {
-      ...question,
-      parsedCode: parsedLines,
-      errorPositions,
-    };
-  };
 
   const registerGeneratedQuestion = (parsedQuestion) => {
     setParsedQuestions((prev) => {
@@ -246,10 +197,6 @@ const App = () => {
       setCurrentQuestion(updated.length - 1);
       return updated;
     });
-    setClicks([]);
-    setShowResults(false);
-    setShowSolution(false);
-    setCurrentResult(null);
     setGameComplete(false);
   };
 
@@ -259,10 +206,6 @@ const App = () => {
     setParsedQuestions([]);
     setCurrentQuestion(0);
     setActivePipelineTab(blueprintSteps[0]?._id || null);
-    setShowResults(false);
-    setShowSolution(false);
-    setCurrentResult(null);
-    setClicks([]);
     setTotalScore(0);
     setGameComplete(false);
     setStep1Result(null);
@@ -399,49 +342,6 @@ const App = () => {
     startLiveGeneration(selectedDifficulty, selectedSubtopic);
   };
 
-  const calculateScore = (clicksToCheck, errors, hasNoErrors = false) => {
-    const correctClicks = clicksToCheck.filter(
-      (click) => click.errorId && errors.some((error) => error.id === click.errorId)
-    ).length;
-
-    const falsePositives = clicksToCheck.length - correctClicks;
-    const missedErrors = errors.length - correctClicks;
-
-    if (hasNoErrors) {
-      return {
-        score: falsePositives === 0 ? 100 : Math.max(0, 100 - falsePositives * 25),
-        correctClicks: 0,
-        falsePositives,
-        missedErrors: 0,
-        breakdown: {
-          baseScore: falsePositives === 0 ? '100.0' : '0.0',
-          penalty: falsePositives * 25,
-          final: (falsePositives === 0 ? 100 : Math.max(0, 100 - falsePositives * 25)).toFixed(1),
-        },
-      };
-    }
-
-    const precision = clicksToCheck.length > 0 ? correctClicks / clicksToCheck.length : 1;
-    const recall = errors.length > 0 ? correctClicks / errors.length : 1;
-    const f1Score = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-    const finalScore = f1Score * 100;
-
-    return {
-      score: finalScore,
-      correctClicks,
-      falsePositives,
-      missedErrors,
-      breakdown: {
-        baseScore: (recall * 100).toFixed(1),
-        penalty:
-          falsePositives > 0
-            ? `Precision: ${(precision * 100).toFixed(1)}%`
-            : 'No false positives',
-        final: finalScore.toFixed(1),
-      },
-    };
-  };
-
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return '—';
     try {
@@ -470,78 +370,15 @@ const App = () => {
     }
   };
 
-  const handleErrorClick = (event, errorId, lineIndex) => {
-    if (showResults || clicks.length >= 3) return;
-
-    event.stopPropagation();
-    const codeRect = codeRef.current.getBoundingClientRect();
-
-    const newClick = {
-      line: lineIndex,
-      errorId,
-      position: {
-        x: event.clientX - codeRect.left,
-        y: event.clientY - codeRect.top,
-      },
-      id: Date.now(),
-      isCorrect: true,
-    };
-
-    const newClicks = [...clicks, newClick];
-    setClicks(newClicks);
-
-    if (newClicks.length >= 3) {
-      setTimeout(() => checkAnswer(newClicks), 500);
-    }
-  };
-
-  const handleLineClick = (event, lineIndex) => {
-    if (showResults || clicks.length >= 3) return;
-
-    event.stopPropagation();
-    const codeRect = codeRef.current.getBoundingClientRect();
-
-    const newClick = {
-      line: lineIndex,
-      errorId: null,
-      position: {
-        x: event.clientX - codeRect.left,
-        y: event.clientY - codeRect.top,
-      },
-      id: Date.now(),
-      isCorrect: false,
-    };
-
-    const newClicks = [...clicks, newClick];
-    setClicks(newClicks);
-
-    if (newClicks.length >= 3) {
-      setTimeout(() => checkAnswer(newClicks), 500);
-    }
-  };
-
-  const checkAnswer = (clicksToCheck = clicks) => {
-    if (parsedQuestions.length === 0) return;
-
-    const currentQ = parsedQuestions[currentQuestion];
-    const result = calculateScore(clicksToCheck, currentQ.errors);
-
-    setTotalScore((prev) => prev + result.score);
-    setCurrentResult(result);
-    setShowResults(true);
-  };
-
   const submitAnswer = () => {
-    checkAnswer();
+    // This function is now called by the QuestionPlayground component
+    // when the user clicks "Show answers". We can add scoring logic here
+    // in the future if needed, but for now, it's just a placeholder.
   };
 
   const nextQuestion = () => {
     if (currentQuestion < parsedQuestions.length - 1) {
       setCurrentQuestion((prev) => prev + 1);
-      setClicks([]);
-      setShowResults(false);
-      setShowSolution(false);
-      setCurrentResult(null);
     } else {
       setGameComplete(true);
     }
@@ -549,12 +386,8 @@ const App = () => {
 
   const resetGame = () => {
     setCurrentQuestion(0);
-    setClicks([]);
-    setShowResults(false);
     setGameComplete(false);
     setTotalScore(0);
-    setShowSolution(false);
-    setCurrentResult(null);
   };
 
   const handleDevModeClick = () => {
@@ -636,7 +469,6 @@ const App = () => {
           currentQuestionIndex={currentQuestion}
           totalQuestions={parsedQuestions.length}
           totalScore={totalScore}
-          showResults={showResults}
         />
 
         {isDevMode && generationMode === 'demo' && demoAssessments.length > 0 && (
@@ -682,20 +514,9 @@ const App = () => {
             currentQuestion={currentQ}
             progressPercent={progressPercent}
             difficultyClass={getDifficultyColor(currentQ.difficulty)}
-            codeRef={codeRef}
-            clicks={clicks}
-            showResults={showResults}
-            currentResult={currentResult}
-            showSolution={showSolution}
-            setShowSolution={setShowSolution}
-            submitAnswer={submitAnswer}
-            nextQuestion={nextQuestion}
+            onSubmit={submitAnswer}
+            onNext={nextQuestion}
             hasMoreQuestions={currentQuestion < parsedQuestions.length - 1}
-            currentQuestionIndex={currentQuestion}
-            totalQuestions={parsedQuestions.length}
-            totalScore={totalScore}
-            handleErrorClick={handleErrorClick}
-            handleLineClick={handleLineClick}
           />
         )}
       </div>
