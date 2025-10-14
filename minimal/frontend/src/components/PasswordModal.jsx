@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'
 
 const PasswordModal = ({
   isOpen,
@@ -6,35 +6,52 @@ const PasswordModal = ({
   setPassword,
   onSubmit,
   onCancel,
+  hint = null,
 }) => {
   if (!isOpen) return null;
 
-  const handleSubmit = (event) => {
-    event.preventDefault();
+  const handleSubmit = (e) => {
+    e.preventDefault();
     onSubmit();
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') onCancel();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">
-          Enter Dev Mode Password
-        </h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dev-mode-title"
+    >
+      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+        <div className="mb-4">
+          <h2 id="dev-mode-title" className="text-xl font-bold text-gray-800">
+            Dev Mode Access
+          </h2>
+          {hint && <p className="mt-1 text-sm text-gray-600">{hint}</p>}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="dev-password" className="mb-2 block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="dev-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder="Enter password"
-              autoFocus
-            />
-          </div>
+          <label
+            htmlFor="dev-password"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Password
+          </label>
+          <input
+            id="dev-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            placeholder="Enter password"
+            autoFocus
+          />
+
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
