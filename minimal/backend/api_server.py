@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from corrected_7step_pipeline import CorrectedSevenStepPipeline
+from refactored_pipeline.pipeline.orchestrator import Orchestrator
 from config import load_prompts
 
 # Configure logging
@@ -88,17 +88,17 @@ class HealthResponse(BaseModel):
     version: str
 
 # Initialize pipeline (singleton pattern for efficiency)
-pipeline: Optional[CorrectedSevenStepPipeline] = None
+pipeline: Optional[Orchestrator] = None
 
-def get_pipeline() -> CorrectedSevenStepPipeline:
+def get_pipeline() -> Orchestrator:
     """Lazy initialization of pipeline singleton"""
     global pipeline
     if MOCK_PIPELINE:
         raise HTTPException(503, "Pipeline is disabled in mock mode.")
     if pipeline is None:
-        logger.info("Initializing CorrectedSevenStepPipeline...")
+        logger.info("Initializing Orchestrator...")
         try:
-            pipeline = CorrectedSevenStepPipeline()
+            pipeline = Orchestrator()
             logger.info("Pipeline initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize pipeline: {e}")
@@ -493,7 +493,7 @@ def format_sse_message(data: dict, event_type: str = "message") -> str:
     return f"event: {event_type}\ndata: {json_data}\n\n"
 
 async def run_pipeline_streaming(
-    pipeline: CorrectedSevenStepPipeline,
+    pipeline: Orchestrator,
     topic: str,
     max_retries: int
 ) -> AsyncGenerator[dict, None]:

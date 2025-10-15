@@ -1,8 +1,8 @@
-from corrected_7step_pipeline import CorrectedSevenStepPipeline
+from refactored_pipeline.pipeline.orchestrator import Orchestrator
 
 
 def main() -> None:
-    pipeline = CorrectedSevenStepPipeline()
+    pipeline = Orchestrator()
     topic = "LLM Post-Training with DPO"
 
     print(f"▶️  Starting pipeline for topic: {topic}")

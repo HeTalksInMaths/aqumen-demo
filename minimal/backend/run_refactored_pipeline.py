@@ -2,21 +2,13 @@ import time
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from refactored_pipeline.pipeline.orchestrator import Orchestrator
+from typing import List
+from datetime import datetime
+import os
+import json
 
-def main():
+def run_batch_test(pipeline: Orchestrator, topics: List[str]):
     """Run the corrected 7-step pipeline with a batch of topics and track execution time."""
-    topics = [
-        "Prompt Engineering",
-        "LangChain",
-        "ChatGPT API",
-        "Debugging Generative AI",
-        "AI Agents",
-        "Gradio",
-        "Diffusion Models",
-        "Advanced Retrieval (RAG)",
-        "Finetuning LLMs",
-        "Reinforcement Learning (RLHF)"
-    ]
 
     parallel = "--parallel" in sys.argv
 
@@ -27,8 +19,6 @@ def main():
         print("Running in sequential mode.")
 
     start_time = time.time()
-
-    pipeline = Orchestrator()
 
     if parallel:
         results = []
@@ -69,12 +59,8 @@ def main():
 
     save_results(pipeline, results)
 
-def save_results(pipeline: Orchestrator, results: list):
+def save_results(pipeline: Orchestrator, results: List):
     '''Save comprehensive results'''
-    import json
-    from datetime import datetime
-    import os
-
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Convert to serializable format
@@ -125,7 +111,7 @@ def save_results(pipeline: Orchestrator, results: list):
         }
     }
 
-    filename = os.path.join(pipeline.results_file)
+    filename = os.path.join(pipeline.script_dir, "..", "..", f"corrected_7step_results_{timestamp}.json")
     with open(filename, "w") as f:
         json.dump(final_data, f, indent=2)
 
@@ -133,7 +119,7 @@ def save_results(pipeline: Orchestrator, results: list):
     print(f"📝 Detailed logs in: {pipeline.log_file}")
     print(f"💾 Full step data stored in database: {pipeline.db_path}")
 
-def _extract_common_failures(results: list) -> dict:
+def _extract_common_failures(results: List) -> dict:
     '''Extract common patterns from weak model failures'''
     failure_counts = {}
     for result in results:
@@ -146,6 +132,21 @@ def _extract_common_failures(results: list) -> dict:
     # Return top 5 most common failures
     sorted_failures = sorted(failure_counts.items(), key=lambda x: x[1], reverse=True)
     return dict(sorted_failures[:5])
+
+def main():
+    """Run corrected 7-step pipeline test"""
+    pipeline = Orchestrator()
+
+    test_topics = [
+        "LLM Post-Training with DPO",
+        "Model Quantization and Optimization",
+        "Reinforcement Learning from Human Feedback (RLHF)"
+    ]
+
+    print("🧠 REFACTORED 7-Step Adversarial Pipeline Test")
+    print("="*50)
+
+    run_batch_test(pipeline, test_topics)
 
 if __name__ == "__main__":
     main()
