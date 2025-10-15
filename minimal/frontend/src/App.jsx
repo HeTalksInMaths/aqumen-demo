@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { fetchQuestionStreaming, checkAPIHealth, fetchPrompts, fetchStep1Categories } from './api';
 import HeaderSection from './components/HeaderSection';
+import PasswordModal from './components/PasswordModal';
 import PipelinePanel from './components/PipelinePanel';
 import LiveEmptyState from './components/LiveEmptyState';
 import QuestionPlayground from './components/QuestionPlayground';
@@ -442,6 +443,14 @@ const App = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+      <PasswordModal
+        isOpen={showPasswordPrompt}
+        password={devPassword}
+        setPassword={setDevPassword}
+        onSubmit={checkDevPassword}
+        onCancel={cancelPasswordPrompt}
+        hint="Use the shared demo password to unlock developer tooling."
+      />
       <div className="bg-white rounded-lg shadow-2xl p-6">
         <HeaderSection
           isDevMode={isDevMode}
