@@ -196,6 +196,7 @@ dist/
 .nyc_output/
 test-results/
 coverage/
+/minimal/backend/results
 
 # === PROJECT SPECIFIC ===
 # Large model files (if any)

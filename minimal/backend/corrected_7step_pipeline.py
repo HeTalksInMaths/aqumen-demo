@@ -729,7 +729,7 @@ class CorrectedSevenStepPipeline:
             if not (self.min_error_span <= len(error_id) <= self.max_error_span):
                 errors.append(f"Error id '{error_id}' must be between {self.min_error_span} and {self.max_error_span} characters (found {len(error_id)}).")
 
-            occurrences = joined_content.count(f"<<{error_id}">")
+            occurrences = joined_content.count(f"<<{error_id}>>")
             if occurrences != 1:
                 errors.append(f"Error id '{error_id}' must appear exactly once in the content; found {occurrences}.")
 
@@ -1221,14 +1221,15 @@ class CorrectedSevenStepPipeline:
                 print(f"✅ SUCCESS: Achieved differentiation in {result.total_attempts} attempts")
                 if result.weak_model_failures:
                     print(f"   Weak model failures: {', '.join(result.weak_model_failures)}")
-                    else:
-                        print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
-                
-                # Save results
-                # self.save_results(results)
-                return results
-            
-            def save_results(self, results: List[SevenStepResult]):        '''Save comprehensive results'''
+            else:
+                print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
+
+        # Save results
+        self.save_results(results)
+        return results
+
+    def save_results(self, results: List[SevenStepResult]):
+        '''Save comprehensive results'''
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Convert to serializable format
@@ -1264,9 +1265,9 @@ class CorrectedSevenStepPipeline:
                 "timestamp": datetime.now().isoformat(),
                 "total_topics": len(results),
                 "model_config": {
-                    "opus": self.model_opus,
-                    "sonnet": self.model_sonnet,
-                    "haiku": self.model_haiku
+                    "strong": self.model_strong,
+                    "mid": self.model_mid,
+                    "weak": self.model_weak
                 }
             },
             "results": results_data,
