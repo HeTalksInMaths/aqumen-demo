@@ -729,7 +729,7 @@ class CorrectedSevenStepPipeline:
             if not (self.min_error_span <= len(error_id) <= self.max_error_span):
                 errors.append(f"Error id '{error_id}' must be between {self.min_error_span} and {self.max_error_span} characters (found {len(error_id)}).")
 
-            occurrences = joined_content.count(f"<<{error_id}">")
+            occurrences = joined_content.count(f"<<{error_id}">>")
             if occurrences != 1:
                 errors.append(f"Error id '{error_id}' must appear exactly once in the content; found {occurrences}.")
 
