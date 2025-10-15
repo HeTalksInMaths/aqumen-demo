@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { fetchQuestionStreaming, checkAPIHealth, fetchPrompts, fetchStep1Categories } from './api';
 import HeaderSection from './components/HeaderSection';
+import PasswordModal from './components/PasswordModal';
 import PipelinePanel from './components/PipelinePanel';
 import LiveEmptyState from './components/LiveEmptyState';
 import QuestionPlayground from './components/QuestionPlayground';
@@ -448,11 +449,6 @@ const App = () => {
           viewMode={viewMode}
           setViewMode={setViewMode}
           handleDevModeClick={handleDevModeClick}
-          showPasswordPrompt={showPasswordPrompt}
-          devPassword={devPassword}
-          setDevPassword={setDevPassword}
-          checkDevPassword={checkDevPassword}
-          cancelPasswordPrompt={cancelPasswordPrompt}
           pipelineSteps={pipelineSteps}
           generationMode={generationMode}
           setGenerationMode={setGenerationMode}
@@ -590,6 +586,14 @@ const App = () => {
           </div>
         </div>
       )}
+      <PasswordModal
+        isOpen={showPasswordPrompt}
+        password={devPassword}
+        setPassword={setDevPassword}
+        onSubmit={checkDevPassword}
+        onCancel={cancelPasswordPrompt}
+        hint="Password is shared in internal docs."
+      />
     </div>
   );
 };
