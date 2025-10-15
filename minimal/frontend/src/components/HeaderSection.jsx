@@ -1,10 +1,17 @@
 import React from 'react';
 import { Award, Loader, Sparkles } from 'lucide-react';
+import PasswordModal from './PasswordModal';
+
 const HeaderSection = ({
   isDevMode,
   viewMode,
   setViewMode,
   handleDevModeClick,
+  showPasswordPrompt,
+  devPassword,
+  setDevPassword,
+  checkDevPassword,
+  cancelPasswordPrompt,
   pipelineSteps,
   generationMode,
   setGenerationMode,
@@ -81,6 +88,15 @@ const HeaderSection = ({
           Dev Mode (Streaming)
         </button>
       </div>
+
+      <PasswordModal
+        isOpen={showPasswordPrompt}
+        password={devPassword}
+        setPassword={setDevPassword}
+        onSubmit={checkDevPassword}
+        onCancel={cancelPasswordPrompt}
+        hint="Password is shared in internal docs."
+      />
 
 
       {viewMode === 'student' && pipelineSteps.length > 0 && (

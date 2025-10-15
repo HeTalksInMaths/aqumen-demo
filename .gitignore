@@ -239,6 +239,10 @@ tests/
 **/playwright.config.ts
 **/.eslintignore
 **/.eslintrc.cjs
+!/minimal/frontend/playwright.config.ts
+!/minimal/frontend/tests/
+!/minimal/frontend/tests/**
 
 # Temporary frontend scripts
 **/fix_demo_data.py
+
