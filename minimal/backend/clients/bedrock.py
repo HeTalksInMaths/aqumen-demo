@@ -203,13 +203,19 @@ class BedrockRuntime:
             "model_breakdown": model_breakdown
         }
 
-    def invoke(self, model_id: str, prompt: str, max_tokens: int = 2048) -> str:
+    def invoke(
+        self,
+        model_id: str,
+        prompt: str,
+        max_tokens: int = 2048,
+        temperature: float = 0.0,
+    ) -> str:
         """Invoke model with retry logic and cost tracking"""
         body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.7,
+            "temperature": temperature,
         }
 
         data, _ = self._invoke_with_retry(model_id, body)
@@ -223,14 +229,18 @@ class BedrockRuntime:
         max_tokens: int = 2048,
         use_thinking: bool = False,
         thinking_budget: int = 2048,
+        temperature: float = 0.0,
     ) -> Dict[str, Any]:
         """Invoke model with tools, retry logic and cost tracking"""
+        temp_value = temperature
+        if use_thinking:
+            temp_value = 1.0  # Thinking mode requires temperature = 1 per Claude Extended Thinking spec
         body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": max_tokens,
             "messages": [{"role": "user", "content": prompt}],
             "tools": tools,
-            "temperature": 0.7,
+            "temperature": temp_value,
         }
         if use_thinking:
             body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}

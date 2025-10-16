@@ -782,7 +782,13 @@ class CorrectedSevenStepPipeline:
                 validation_feedback=validation_feedback
             )
 
-            response = self.invoke_model_with_tools(self.model_strong, prompt, tools)
+            use_thinking = (attempt > 1 and getattr(self, 'judge_supports_thinking', False))
+            response = self.invoke_model_with_tools(
+                self.model_strong,
+                prompt,
+                tools,
+                use_thinking=use_thinking
+            )
             step = PipelineStep(
                 7,
                 f"Create student assessment from weak model failures (attempt {attempt})",
