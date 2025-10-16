@@ -19,6 +19,7 @@ import re
 from config import load_prompts, load_tools
 from roles import load_model_roles
 from clients.bedrock import BedrockRuntime
+from clients.provider import get_model_provider, get_provider_info
 from services.invoke import Invoker
 from persistence.repo import Repo
 import sqlite3
@@ -59,19 +60,42 @@ class SevenStepResult:
     weak_model_failures: List[str]  # Track actual failure patterns
 
 class CorrectedSevenStepPipeline:
-    def __init__(self):
-        '''Initialize the corrected 7-step pipeline with timestamped logging'''
-        self.roles = load_model_roles()
-        self.aws_region = "us-west-2"
+    def __init__(self, provider: str = "anthropic"):
+        '''
+        Initialize the corrected 7-step pipeline with timestamped logging.
 
-        # Model assignments (env-driven with sensible defaults)
-        self.model_strong = self.roles["judge"].id
-        self.model_mid = self.roles["mid"].id
-        self.model_weak = self.roles["weak"].id
-        self.judge_supports_thinking = self.roles["judge"].supports_thinking
+        Args:
+            provider: Model provider to use - either "anthropic" (default) or "openai"
+        '''
+        self.provider = provider
 
-        self.bedrock_runtime = BedrockRuntime(region=self.aws_region)
-        self.invoker = Invoker(self.bedrock_runtime)
+        # Get client and models for the specified provider
+        try:
+            self.runtime_client, models = get_model_provider(provider)
+            self.model_strong = models["strong"]
+            self.model_mid = models["mid"]
+            self.model_weak = models["weak"]
+
+            # For Anthropic, check if judge supports thinking
+            if provider == "anthropic":
+                self.roles = load_model_roles()
+                self.judge_supports_thinking = self.roles["judge"].supports_thinking
+            else:
+                # OpenAI thinking support TBD
+                self.judge_supports_thinking = False
+
+            logger.info(f"Pipeline initialized with provider: {provider}")
+            logger.info(f"Models - Strong: {self.model_strong}, Mid: {self.model_mid}, Weak: {self.model_weak}")
+        except Exception as e:
+            logger.error(f"Failed to initialize pipeline with provider '{provider}': {e}")
+            raise
+
+        # Maintain backward compatibility for Bedrock-specific attributes
+        if provider == "anthropic":
+            self.bedrock_runtime = self.runtime_client
+            self.aws_region = "us-west-2"
+
+        self.invoker = Invoker(self.runtime_client)
 
         # Get the absolute path of the directory containing this script
         script_dir = os.path.dirname(os.path.abspath(__file__))
