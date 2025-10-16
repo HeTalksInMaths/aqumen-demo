@@ -104,21 +104,34 @@ def get_pipeline(provider: str = "openai") -> CorrectedSevenStepPipeline:
     if MOCK_PIPELINE:
         raise HTTPException(503, "Pipeline is disabled in mock mode.")
 
+    requested_provider = provider
+
     # Validate provider
-    if provider not in ["anthropic", "openai"]:
-        raise HTTPException(400, f"Invalid provider: {provider}. Must be 'anthropic' or 'openai'")
+    if requested_provider not in ["anthropic", "openai"]:
+        raise HTTPException(400, f"Invalid provider: {requested_provider}. Must be 'anthropic' or 'openai'")
+
+    # If OpenAI credentials are missing, fall back to Anthropic to keep legacy deployments alive.
+    if requested_provider == "openai":
+        has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        has_azure_creds = bool(os.getenv("AZURE_OPENAI_ENDPOINT") and os.getenv("AZURE_OPENAI_API_KEY"))
+        if not (has_openai_key or has_azure_creds):
+            logger.warning(
+                "OpenAI selected but no OPENAI_API_KEY/Azure credentials found. "
+                "Falling back to Anthropic pipeline to preserve availability."
+            )
+            requested_provider = "anthropic"
 
     # Initialize pipeline for this provider if not already done
-    if provider not in pipelines:
-        logger.info(f"Initializing CorrectedSevenStepPipeline with provider: {provider}...")
+    if requested_provider not in pipelines:
+        logger.info(f"Initializing CorrectedSevenStepPipeline with provider: {requested_provider}...")
         try:
-            pipelines[provider] = CorrectedSevenStepPipeline(provider=provider)
-            logger.info(f"Pipeline initialized successfully for provider: {provider}")
+            pipelines[requested_provider] = CorrectedSevenStepPipeline(provider=requested_provider)
+            logger.info(f"Pipeline initialized successfully for provider: {requested_provider}")
         except Exception as e:
-            logger.error(f"Failed to initialize pipeline for provider '{provider}': {e}")
+            logger.error(f"Failed to initialize pipeline for provider '{requested_provider}': {e}")
             raise HTTPException(500, f"Failed to initialize pipeline: {str(e)}")
 
-    return pipelines[provider]
+    return pipelines[requested_provider]
 
 @app.on_event("startup")
 async def startup_event():
