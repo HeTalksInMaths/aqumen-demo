@@ -340,9 +340,9 @@ class CorrectedSevenStepPipeline:
         template = self._get_prompt_template("step1_difficulty_categories")
         prompt = template.format(topic=topic)
         tools = self._get_tools("step1_difficulty_categories")
-        
-        response = self.invoke_model_with_tools(self.model_strong, prompt, tools)
-        step = PipelineStep(1, "Generate difficulty categories", self.model_strong, False, str(response), datetime.now().isoformat())
+
+        response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
+        step = PipelineStep(1, "Generate difficulty categories", self.model_mid, False, str(response), datetime.now().isoformat())
 
         categories: Dict[str, List[str]] = {}
         try:
@@ -378,9 +378,9 @@ class CorrectedSevenStepPipeline:
         template = self._get_prompt_template("step2_error_catalog")
         prompt = template.format(topic=topic, difficulty=difficulty, subtopic=subtopic)
         tools = self._get_tools("step2_error_catalog")
-        
-        response = self.invoke_model_with_tools(self.model_strong, prompt, tools)
-        step = PipelineStep(2, "Generate conceptual error catalog", self.model_strong, False, str(response), datetime.now().isoformat())
+
+        response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
+        step = PipelineStep(2, "Generate conceptual error catalog", self.model_mid, False, str(response), datetime.now().isoformat())
 
         errors: List[Dict[str, Any]] = []
         try:
@@ -1287,6 +1287,11 @@ class CorrectedSevenStepPipeline:
         print(f"📝 Detailed logs in: {self.log_file}")
         print(f"💾 Full step data stored in database: {self.db_path}")
 
+        # Save results
+        # self.save_results(results)
+        return results
+
+    
     def _extract_common_failures(self, results: List[SevenStepResult]) -> Dict[str, int]:
         '''Extract common patterns from weak model failures'''
         failure_counts = {}
