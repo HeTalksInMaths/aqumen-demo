@@ -3,10 +3,10 @@ import json
 import time
 import random
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 from openai import APIError, RateLimitError, APIConnectionError
 
 # Load environment variables from .env file
@@ -107,8 +107,9 @@ class OpenAIRuntime:
 
     def __init__(self):
         self.usage_log: List[UsageMetrics] = []
-        self._client: Optional[OpenAI] = None
+        self._client: Optional[Union[OpenAI, AzureOpenAI]] = None
         self._is_azure = False
+        self._azure_default_deployment: Optional[str] = None
         self._import_error: Optional[Exception] = None
 
         try:
@@ -119,15 +120,21 @@ class OpenAIRuntime:
             if azure_endpoint and azure_api_key:
                 # Azure OpenAI configuration
                 self._is_azure = True
-                base_url = azure_endpoint.rstrip("/")
-                if "/openai" not in base_url:
-                    base_url = f"{base_url}/openai/v1/"
+                api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+                endpoint = azure_endpoint.rstrip("/")
 
-                self._client = OpenAI(
-                    base_url=base_url,
+                self._client = AzureOpenAI(
                     api_key=azure_api_key,
+                    azure_endpoint=endpoint,
+                    api_version=api_version,
                 )
-                logger.info("Initialized Azure OpenAI client")
+                self._azure_default_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+                if not self._azure_default_deployment:
+                    logger.warning(
+                        "AZURE_OPENAI_DEPLOYMENT not set – using model IDs as deployment names. "
+                        "Ensure Azure deployments match the requested model IDs."
+                    )
+                logger.info("Initialized Azure OpenAI client with api_version=%s", api_version)
             else:
                 # Direct OpenAI API
                 api_key = os.getenv("OPENAI_API_KEY")
@@ -142,7 +149,7 @@ class OpenAIRuntime:
             self._client = None
             logger.error(f"Failed to initialize OpenAI client: {exc}")
 
-    def _ensure_client(self) -> OpenAI:
+    def _ensure_client(self) -> Union[OpenAI, AzureOpenAI]:
         if self._client is None:
             raise RuntimeError(
                 "OpenAI client unavailable. Set OPENAI_API_KEY or Azure credentials. "
@@ -238,7 +245,7 @@ class OpenAIRuntime:
         # Use Azure deployment name if configured, otherwise use model_id
         # This matches the CUA pattern: deployment = azure_deployment or model
         if self._is_azure:
-            azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+            azure_deployment = self._azure_default_deployment or os.getenv("AZURE_OPENAI_DEPLOYMENT")
             model_to_use = azure_deployment or model_id
         else:
             model_to_use = model_id
