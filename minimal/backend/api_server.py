@@ -167,22 +167,22 @@ async def get_models():
         return {
             "models": {
                 "strong": {
-                    "id": p.model_opus,
-                    "description": "Claude Sonnet 4.5 - Used for judge, question generation, and Step 7 (with thinking mode on retries)",
-                    "purpose": "Strategic reasoning, quality assessment"
+                    "id": p.model_strong,
+                    "description": "Claude Opus 4.1 - Used for strategic question generation (Step 3), judging (Step 6), and assessment creation (Step 7)",
+                    "purpose": "Strategic reasoning, quality assessment, complex reasoning"
                 },
                 "mid": {
-                    "id": p.model_sonnet,
-                    "description": "Claude Sonnet 4 - Should succeed at the question",
-                    "purpose": "Competent implementation baseline"
+                    "id": p.model_mid,
+                    "description": "Claude Sonnet 4.5 - Used for difficulty categories (Step 1), error catalog (Step 2), and mid-tier implementation (Step 4)",
+                    "purpose": "Competent implementation baseline, category generation"
                 },
                 "weak": {
-                    "id": p.model_haiku,
-                    "description": "Claude Haiku 3 - Target to fail with conceptual errors",
-                    "purpose": "Generate errors for assessment creation"
+                    "id": p.model_weak,
+                    "description": "Claude Haiku 4.5 - Used for weak-tier implementation (Step 5) to generate conceptual errors",
+                    "purpose": "Generate realistic errors for assessment creation"
                 }
             },
-            "pipeline_flow": "Steps 1-3: Strong → Steps 4-6: Strong+Mid+Weak → Step 7: Strong (with validation)"
+            "pipeline_flow": "Steps 1-2: Mid (Sonnet 4.5) → Step 3: Strong (Opus 4.1) → Step 4: Mid → Step 5: Weak (Haiku 4.5) → Steps 6-7: Strong"
         }
     except Exception as e:
         logger.exception("Failed to get model info")
@@ -477,6 +477,143 @@ async def get_prompts():
             status_code=500,
             detail=f"Failed to retrieve prompts: {exc}"
         ) from exc
+
+@app.post("/api/step1")
+async def step1_categories(request: dict):
+    """
+    Generate Step 1 difficulty categories for a topic.
+
+    This endpoint runs only Step 1 of the pipeline to generate difficulty categories,
+    which the frontend uses before running the full pipeline.
+
+    Request body:
+    {
+        "topic": "AI/ML topic for categorization"
+    }
+    """
+    topic = request.get("topic")
+    if not topic or len(topic.strip()) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Topic is required and must be at least 3 characters long"
+        )
+
+    logger.info(f"Step 1 request received for topic: {topic}")
+
+    try:
+        p = get_pipeline()
+
+        # Run only Step 1
+        success, categories, step1_result = p.step1_generate_difficulty_categories(topic.strip())
+
+        if not success:
+            logger.error(f"Step 1 failed for topic: {topic}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Step 1 failed: {step1_result.response if step1_result.response else 'Unknown error'}"
+            )
+
+        logger.info(f"Step 1 completed successfully for topic: {topic}")
+
+        # Return the categories and step info
+        return {
+            "success": True,
+            "categories": categories,
+            "step_info": {
+                "step_number": step1_result.step_number,
+                "step_name": step1_result.step_name,
+                "model_used": step1_result.model_used,
+                "success": step1_result.success,
+                "timestamp": step1_result.timestamp,
+                "response": step1_result.response
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error during Step 1")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@app.post("/api/test-models")
+async def test_models():
+    """
+    Test all three models to verify they're accessible and responding.
+
+    This endpoint quickly verifies that Opus 4.1, Sonnet 4.5, and Haiku 4.5
+    are all working by sending a simple prompt to each.
+    """
+    logger.info("Testing all three models...")
+
+    try:
+        p = get_pipeline()
+        test_prompt = "Respond with: hello"
+
+        # Test all three models
+        results = {}
+
+        # Test strong model (Opus 4.1)
+        try:
+            strong_response = p.invoke_model(p.model_strong, test_prompt)
+            results["strong"] = {
+                "model_id": p.model_strong,
+                "response": strong_response.strip(),
+                "success": True
+            }
+        except Exception as e:
+            results["strong"] = {
+                "model_id": p.model_strong,
+                "error": str(e),
+                "success": False
+            }
+
+        # Test mid model (Sonnet 4.5)
+        try:
+            mid_response = p.invoke_model(p.model_mid, test_prompt)
+            results["mid"] = {
+                "model_id": p.model_mid,
+                "response": mid_response.strip(),
+                "success": True
+            }
+        except Exception as e:
+            results["mid"] = {
+                "model_id": p.model_mid,
+                "error": str(e),
+                "success": False
+            }
+
+        # Test weak model (Haiku 4.5)
+        try:
+            weak_response = p.invoke_model(p.model_weak, test_prompt)
+            results["weak"] = {
+                "model_id": p.model_weak,
+                "response": weak_response.strip(),
+                "success": True
+            }
+        except Exception as e:
+            results["weak"] = {
+                "model_id": p.model_weak,
+                "error": str(e),
+                "success": False
+            }
+
+        logger.info(f"Model test results: {list(results.keys())}")
+
+        return {
+            "success": True,
+            "models": results,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.exception("Error during model testing")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model testing failed: {str(e)}"
+        )
 
 # Helper functions for SSE
 

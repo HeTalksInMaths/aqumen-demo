@@ -83,6 +83,7 @@ const App = () => {
   const rawQuestions = useMemo(() => studentModeQuestions, []);
 
   const codeRef = useRef(null);
+  const backendWarmupRef = useRef(false);
   const isDevMode = viewMode === 'dev';
 
   useEffect(() => {
@@ -200,6 +201,17 @@ const App = () => {
     };
 
     loadPrompts();
+  }, []);
+
+  useEffect(() => {
+    if (backendWarmupRef.current) {
+      return;
+    }
+    backendWarmupRef.current = true;
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    fetch(`${apiBaseUrl}/health`, { cache: 'no-store' }).catch(() => {
+      // Ignore errors – this is a best-effort warm-up call.
+    });
   }, []);
 
   const parseQuestion = (question) => {
