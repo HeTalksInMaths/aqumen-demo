@@ -80,6 +80,8 @@ const App = () => {
   // Student mode demo questions - imported from demoData.student.js
   const rawQuestions = useMemo(() => studentModeQuestions, []);
 
+  const codeRef = useRef(null);
+  const backendWarmupRef = useRef(false);
   const isDevMode = viewMode === 'dev';
 
   useEffect(() => {
@@ -191,6 +193,54 @@ const App = () => {
     loadPrompts();
   }, []);
 
+  useEffect(() => {
+    if (backendWarmupRef.current) {
+      return;
+    }
+    backendWarmupRef.current = true;
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    fetch(`${apiBaseUrl}/health`, { cache: 'no-store' }).catch(() => {
+      // Ignore errors – this is a best-effort warm-up call.
+    });
+  }, []);
+
+  const parseQuestion = (question) => {
+    const parsedLines = [];
+    const errorPositions = [];
+
+    question.code.forEach((line, lineIndex) => {
+      let cleanLine = line;
+      let processedChars = 0;
+
+      const delimiterRegex = /<<([^>]+)>>/g;
+      let match;
+
+      while ((match = delimiterRegex.exec(line)) !== null) {
+        const errorText = match[1];
+        const startPos = match.index - processedChars;
+        const endPos = startPos + errorText.length;
+
+        errorPositions.push({
+          line: lineIndex,
+          startPos,
+          endPos,
+          text: errorText,
+          id: errorText,
+        });
+
+        processedChars += 4;
+      }
+
+      cleanLine = line.replace(/<<([^>]+)>>/g, '$1');
+      parsedLines.push(cleanLine);
+    });
+
+    return {
+      ...question,
+      parsedCode: parsedLines,
+      errorPositions,
+    };
+  };
 
   const registerGeneratedQuestion = (parsedQuestion) => {
     setParsedQuestions((prev) => {
