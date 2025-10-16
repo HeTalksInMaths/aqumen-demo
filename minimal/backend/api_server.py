@@ -17,7 +17,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, Dict
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -87,23 +87,38 @@ class HealthResponse(BaseModel):
     pipeline_ready: bool
     version: str
 
-# Initialize pipeline (singleton pattern for efficiency)
-pipeline: Optional[CorrectedSevenStepPipeline] = None
+# Initialize pipeline (singleton pattern for efficiency, keyed by provider)
+pipelines: Dict[str, CorrectedSevenStepPipeline] = {}
 
-def get_pipeline() -> CorrectedSevenStepPipeline:
-    """Lazy initialization of pipeline singleton"""
-    global pipeline
+def get_pipeline(provider: str = "anthropic") -> CorrectedSevenStepPipeline:
+    """
+    Lazy initialization of pipeline singleton for specified provider.
+
+    Args:
+        provider: Either "anthropic" or "openai" (default: "anthropic")
+
+    Returns:
+        Pipeline instance for the specified provider
+    """
+    global pipelines
     if MOCK_PIPELINE:
         raise HTTPException(503, "Pipeline is disabled in mock mode.")
-    if pipeline is None:
-        logger.info("Initializing CorrectedSevenStepPipeline...")
+
+    # Validate provider
+    if provider not in ["anthropic", "openai"]:
+        raise HTTPException(400, f"Invalid provider: {provider}. Must be 'anthropic' or 'openai'")
+
+    # Initialize pipeline for this provider if not already done
+    if provider not in pipelines:
+        logger.info(f"Initializing CorrectedSevenStepPipeline with provider: {provider}...")
         try:
-            pipeline = CorrectedSevenStepPipeline()
-            logger.info("Pipeline initialized successfully")
+            pipelines[provider] = CorrectedSevenStepPipeline(provider=provider)
+            logger.info(f"Pipeline initialized successfully for provider: {provider}")
         except Exception as e:
-            logger.error(f"Failed to initialize pipeline: {e}")
-            raise HTTPException(500, "Failed to initialize pipeline")
-    return pipeline
+            logger.error(f"Failed to initialize pipeline for provider '{provider}': {e}")
+            raise HTTPException(500, f"Failed to initialize pipeline: {str(e)}")
+
+    return pipelines[provider]
 
 @app.on_event("startup")
 async def startup_event():
@@ -129,7 +144,7 @@ async def health_check():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        pipeline_ready=(pipeline is not None and not MOCK_PIPELINE),
+        pipeline_ready=(len(pipelines) > 0 and not MOCK_PIPELINE),
         version="1.0.0"
     )
 
@@ -191,7 +206,8 @@ async def get_models():
 @app.get("/api/generate-stream")
 async def generate_stream(
     topic: str = Query(..., description="AI/ML topic for question generation", min_length=3),
-    max_retries: int = Query(3, description="Max retries for hard question", ge=1, le=5)
+    max_retries: int = Query(3, description="Max retries for hard question", ge=1, le=5),
+    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
 ):
     """
     Stream the 7-step pipeline execution in real-time using Server-Sent Events (SSE).
@@ -214,7 +230,7 @@ async def generate_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            p = get_pipeline()
+            p = get_pipeline(provider)
             start_time = datetime.now()
 
             # Send initial event
@@ -257,7 +273,10 @@ async def generate_stream(
     )
 
 @app.post("/api/generate", response_model=QuestionResponse)
-async def generate_question(request: GenerateRequest):
+async def generate_question(
+    request: GenerateRequest,
+    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
+):
     """
     Generate a complete question (blocking).
 
@@ -266,11 +285,11 @@ async def generate_question(request: GenerateRequest):
 
     Returns a validated question ready for the frontend.
     """
-    logger.info(f"Generate request received for topic: {request.topic}")
+    logger.info(f"Generate request received for topic: {request.topic} with provider: {provider}")
 
     try:
         start_time = datetime.now()
-        p = get_pipeline()
+        p = get_pipeline(provider)
 
         # Run full pipeline (blocking)
         pipeline_result = p.run_full_pipeline(
@@ -488,20 +507,23 @@ async def step1_categories(request: dict):
 
     Request body:
     {
-        "topic": "AI/ML topic for categorization"
+        "topic": "AI/ML topic for categorization",
+        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
     }
     """
     topic = request.get("topic")
+    provider = request.get("provider", "anthropic")
+
     if not topic or len(topic.strip()) < 3:
         raise HTTPException(
             status_code=400,
             detail="Topic is required and must be at least 3 characters long"
         )
 
-    logger.info(f"Step 1 request received for topic: {topic}")
+    logger.info(f"Step 1 request received for topic: {topic} with provider: {provider}")
 
     try:
-        p = get_pipeline()
+        p = get_pipeline(provider)
 
         # Run only Step 1
         success, categories, step1_result = p.step1_generate_difficulty_categories(topic.strip())
@@ -539,17 +561,22 @@ async def step1_categories(request: dict):
         )
 
 @app.post("/api/test-models")
-async def test_models():
+async def test_models(request: dict = {}):
     """
     Test all three models to verify they're accessible and responding.
 
-    This endpoint quickly verifies that Opus 4.1, Sonnet 4.5, and Haiku 4.5
-    are all working by sending a simple prompt to each.
+    This endpoint quickly verifies the models are working by sending a simple prompt to each.
+
+    Request body (optional):
+    {
+        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
+    }
     """
-    logger.info("Testing all three models...")
+    provider = request.get("provider", "anthropic") if request else "anthropic"
+    logger.info(f"Testing all three models for provider: {provider}...")
 
     try:
-        p = get_pipeline()
+        p = get_pipeline(provider)
         test_prompt = "Respond with: hello"
 
         # Test all three models
