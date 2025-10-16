@@ -4,11 +4,20 @@ This repository contains only the files required to run the GPT-5 Nano computer-
 
 ## What's included
 
+All runtime code remains in the `cua-agent` package so you can run or extend the agent without pulling in the original demo's
+frontend. The most important modules are:
+
 * `cua-agent/cli_gpt5.py` – command-line entrypoint for launching the agent
 * `cua-agent/agent/gpt5_agent.py` – main agent loop and action parsing
 * `cua-agent/computers/` – abstract computer interface and the default local Playwright implementation
-* `cua-agent/utils.py` – shared helpers for API calls, screenshots, and action parsing
+* `cua-agent/utils.py` – shared helpers for API calls, screenshots, and action parsing (including the OpenAI/Azure client logic)
 * `cua-agent/requirements.txt` – Python dependencies to install
+
+> **Where is the OpenAI call made?**
+>
+> The agent ultimately routes every model request through `create_chat_completion` inside `cua-agent/utils.py`. That function
+> detects whether you configured standard OpenAI credentials or Azure OpenAI, selects the correct base URL, and issues the
+> `chat.completions.create(...)` call with your selected GPT model. No Anthropic or Bedrock clients are bundled.
 
 Everything else from the original repository (React frontend, Tailwind config, optional docs) has been removed so this stays as small as possible.
 
