@@ -1221,8 +1221,8 @@ class CorrectedSevenStepPipeline:
                 print(f"✅ SUCCESS: Achieved differentiation in {result.total_attempts} attempts")
                 if result.weak_model_failures:
                     print(f"   Weak model failures: {', '.join(result.weak_model_failures)}")
-                    else:
-                        print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
+                else:
+                    print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
                 
                 # Save results
                 # self.save_results(results)
