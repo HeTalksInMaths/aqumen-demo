@@ -41,7 +41,11 @@ class RunPipelineBatchCLITests(TestCase):
             sys.argv = ["run_pipeline_batch.py", "--file", str(dataset_file)]
             with patch.object(run_pipeline_batch, "main", MagicMock()) as mock_main:
                 run_pipeline_batch.run_from_cli()
-                mock_main.assert_called_once_with(topics)
+                mock_main.assert_called_once()
+                args, kwargs = mock_main.call_args
+                self.assertEqual(list(args[0]), topics)
+                self.assertFalse(kwargs["parallel"])
+                self.assertEqual(kwargs["max_workers"], run_pipeline_batch.DEFAULT_WORKERS)
 
     def test_cli_with_positional_arguments(self):
         """Passing topics as positional args should invoke main() with them."""
@@ -49,7 +53,23 @@ class RunPipelineBatchCLITests(TestCase):
         sys.argv = ["run_pipeline_batch.py", *topics]
         with patch.object(run_pipeline_batch, "main", MagicMock()) as mock_main:
             run_pipeline_batch.run_from_cli()
-            mock_main.assert_called_once_with(topics)
+            mock_main.assert_called_once()
+            args, kwargs = mock_main.call_args
+            self.assertEqual(list(args[0]), topics)
+            self.assertFalse(kwargs["parallel"])
+            self.assertEqual(kwargs["max_workers"], run_pipeline_batch.DEFAULT_WORKERS)
+
+    def test_cli_with_parallel_flag(self):
+        """`--parallel` should toggle parallel execution and respect worker overrides."""
+        topics = ["Topic_A", "Topic_B"]
+        sys.argv = ["run_pipeline_batch.py", "--parallel", "--workers", "3", *topics]
+        with patch.object(run_pipeline_batch, "main", MagicMock()) as mock_main:
+            run_pipeline_batch.run_from_cli()
+            mock_main.assert_called_once()
+            args, kwargs = mock_main.call_args
+            self.assertEqual(list(args[0]), topics)
+            self.assertTrue(kwargs["parallel"])
+            self.assertEqual(kwargs["max_workers"], 3)
 
     def test_cli_with_no_arguments(self):
         """No arguments should exit and emit a usage hint."""
