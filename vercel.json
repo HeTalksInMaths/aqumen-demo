@@ -1,9 +1,10 @@
-{
-  "buildCommand": "cd minimal/frontend && npm install && npm run build",
-  "outputDirectory": "minimal/frontend/dist",
-  "installCommand": "cd minimal/frontend && npm install",
-  "framework": "vite",
-  "env": {
-    "VITE_API_URL": "http://localhost:8000"
+  {
+    "buildCommand": "cd minimal/frontend && npm
+  install && npm run build",
+    "outputDirectory": "minimal/frontend/dist",
+    "installCommand": "cd minimal/frontend &&
+  npm install",
+    "framework": "vite",
+  backend.onrender.com"
+    }
   }
-}
