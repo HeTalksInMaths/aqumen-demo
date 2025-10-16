@@ -30,6 +30,67 @@ class UsageMetrics:
     model_id: str = ""
     response_time_ms: int = 0
 
+
+def convert_anthropic_to_openai_tools(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Convert Anthropic tool definitions to OpenAI function calling format.
+    Detects if tools are already in OpenAI format and skips conversion.
+
+    Anthropic format:
+    {
+        "name": "tool_name",
+        "description": "Tool description",
+        "input_schema": {
+            "type": "object",
+            "properties": {...},
+            "required": [...]
+        }
+    }
+
+    OpenAI format:
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_name",
+            "description": "Tool description",
+            "parameters": {
+                "type": "object",
+                "properties": {...},
+                "required": [...]
+            }
+        }
+    }
+    """
+    openai_tools = []
+
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+
+        # Check if already in OpenAI format
+        if tool.get("type") == "function" and "function" in tool:
+            # Already in OpenAI format, use as-is
+            openai_tools.append(tool)
+            continue
+
+        # Convert from Anthropic format
+        openai_tool = {
+            "type": "function",
+            "function": {
+                "name": tool.get("name", ""),
+                "description": tool.get("description", "")
+            }
+        }
+
+        # Convert input_schema to parameters
+        input_schema = tool.get("input_schema", {})
+        if isinstance(input_schema, dict):
+            openai_tool["function"]["parameters"] = input_schema
+
+        openai_tools.append(openai_tool)
+
+    return openai_tools
+
 class OpenAIRuntime:
     # Pricing per 1M tokens (approximate, update as OpenAI releases pricing)
     PRICING = {
@@ -199,9 +260,10 @@ class OpenAIRuntime:
                     request_params["max_tokens"] = max_tokens
                     request_params["temperature"] = temperature
 
-                # Add tools if provided
+                # Add tools if provided (convert Anthropic format to OpenAI format)
                 if tools:
-                    request_params["tools"] = tools
+                    converted_tools = convert_anthropic_to_openai_tools(tools)
+                    request_params["tools"] = converted_tools
                     request_params["tool_choice"] = "required"
 
                 response = client.chat.completions.create(**request_params)
