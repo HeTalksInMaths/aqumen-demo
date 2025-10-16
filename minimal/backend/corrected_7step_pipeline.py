@@ -60,12 +60,12 @@ class SevenStepResult:
     weak_model_failures: List[str]  # Track actual failure patterns
 
 class CorrectedSevenStepPipeline:
-    def __init__(self, provider: str = "anthropic"):
+    def __init__(self, provider: str = "openai"):
         '''
         Initialize the corrected 7-step pipeline with timestamped logging.
 
         Args:
-            provider: Model provider to use - either "anthropic" (default) or "openai"
+            provider: Model provider to use - either "anthropic" or "openai" (default)
         '''
         self.provider = provider
 

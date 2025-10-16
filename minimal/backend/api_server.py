@@ -90,12 +90,12 @@ class HealthResponse(BaseModel):
 # Initialize pipeline (singleton pattern for efficiency, keyed by provider)
 pipelines: Dict[str, CorrectedSevenStepPipeline] = {}
 
-def get_pipeline(provider: str = "anthropic") -> CorrectedSevenStepPipeline:
+def get_pipeline(provider: str = "openai") -> CorrectedSevenStepPipeline:
     """
     Lazy initialization of pipeline singleton for specified provider.
 
     Args:
-        provider: Either "anthropic" or "openai" (default: "anthropic")
+        provider: Either "anthropic" or "openai" (default: "openai")
 
     Returns:
         Pipeline instance for the specified provider
@@ -207,7 +207,7 @@ async def get_models():
 async def generate_stream(
     topic: str = Query(..., description="AI/ML topic for question generation", min_length=3),
     max_retries: int = Query(3, description="Max retries for hard question", ge=1, le=5),
-    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
+    provider: str = Query("openai", description="Model provider: 'anthropic' or 'openai'")
 ):
     """
     Stream the 7-step pipeline execution in real-time using Server-Sent Events (SSE).
@@ -275,7 +275,7 @@ async def generate_stream(
 @app.post("/api/generate", response_model=QuestionResponse)
 async def generate_question(
     request: GenerateRequest,
-    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
+    provider: str = Query("openai", description="Model provider: 'anthropic' or 'openai'")
 ):
     """
     Generate a complete question (blocking).
@@ -508,11 +508,11 @@ async def step1_categories(request: dict):
     Request body:
     {
         "topic": "AI/ML topic for categorization",
-        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
+        "provider": "anthropic" | "openai" (optional, defaults to "openai")
     }
     """
     topic = request.get("topic")
-    provider = request.get("provider", "anthropic")
+    provider = request.get("provider", "openai")
 
     if not topic or len(topic.strip()) < 3:
         raise HTTPException(
@@ -569,10 +569,10 @@ async def test_models(request: dict = {}):
 
     Request body (optional):
     {
-        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
+        "provider": "anthropic" | "openai" (optional, defaults to "openai")
     }
     """
-    provider = request.get("provider", "anthropic") if request else "anthropic"
+    provider = request.get("provider", "openai") if request else "openai"
     logger.info(f"Testing all three models for provider: {provider}...")
 
     try:

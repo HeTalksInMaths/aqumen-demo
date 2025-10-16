@@ -9,6 +9,13 @@ from dataclasses import dataclass
 from openai import OpenAI
 from openai import APIError, RateLimitError, APIConnectionError
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, rely on system env vars
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -18,6 +25,7 @@ class UsageMetrics:
     output_tokens: int = 0
     cache_creation_input_tokens: int = 0
     cache_read_input_tokens: int = 0
+    reasoning_tokens: int = 0  # GPT-5 internal thinking tokens
     total_cost_usd: float = 0.0
     model_id: str = ""
     response_time_ms: int = 0
@@ -105,11 +113,25 @@ class OpenAIRuntime:
         """Extract usage information from OpenAI response and calculate cost"""
         usage = response.usage if hasattr(response, 'usage') else {}
 
+        # Handle prompt_tokens_details as object (not dict)
+        cached_tokens = 0
+        if hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
+            details = usage.prompt_tokens_details
+            if hasattr(details, 'cached_tokens'):
+                cached_tokens = details.cached_tokens or 0
+
+        # Handle completion_tokens_details for reasoning tokens
+        reasoning_tokens = 0
+        if hasattr(usage, 'completion_tokens_details') and usage.completion_tokens_details:
+            details = usage.completion_tokens_details
+            if hasattr(details, 'reasoning_tokens'):
+                reasoning_tokens = details.reasoning_tokens or 0
+
         # OpenAI uses different field names
         usage_dict = {
             "input_tokens": getattr(usage, 'prompt_tokens', 0),
             "output_tokens": getattr(usage, 'completion_tokens', 0),
-            "cache_creation_input_tokens": getattr(usage, 'prompt_tokens_details', {}).get('cached_tokens', 0) if hasattr(usage, 'prompt_tokens_details') else 0,
+            "cache_creation_input_tokens": cached_tokens,
             "cache_read_input_tokens": 0  # OpenAI doesn't expose this separately yet
         }
 
@@ -118,14 +140,18 @@ class OpenAIRuntime:
             output_tokens=usage_dict["output_tokens"],
             cache_creation_input_tokens=usage_dict["cache_creation_input_tokens"],
             cache_read_input_tokens=usage_dict["cache_read_input_tokens"],
+            reasoning_tokens=reasoning_tokens,
             total_cost_usd=self._calculate_cost(model_id, usage_dict),
             model_id=model_id,
             response_time_ms=int((time.time() - start_time) * 1000)
         )
 
         self.usage_log.append(metrics)
-        logger.info(f"Model {model_id}: {metrics.input_tokens} input, {metrics.output_tokens} output tokens, "
-                   f"cost: ${metrics.total_cost_usd:.4f}, time: {metrics.response_time_ms}ms")
+        log_msg = f"Model {model_id}: {metrics.input_tokens} input, {metrics.output_tokens} output tokens"
+        if reasoning_tokens > 0:
+            log_msg += f" ({reasoning_tokens} reasoning)"
+        log_msg += f", cost: ${metrics.total_cost_usd:.4f}, time: {metrics.response_time_ms}ms"
+        logger.info(log_msg)
 
         return metrics
 
@@ -148,10 +174,11 @@ class OpenAIRuntime:
         """
         client = self._ensure_client()
 
-        # Use Azure deployment name if configured
+        # Use Azure deployment name if configured, otherwise use model_id
+        # This matches the CUA pattern: deployment = azure_deployment or model
         if self._is_azure:
-            azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", model_id)
-            model_to_use = azure_deployment
+            azure_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
+            model_to_use = azure_deployment or model_id
         else:
             model_to_use = model_id
 
@@ -162,14 +189,15 @@ class OpenAIRuntime:
                 request_params = {
                     "model": model_to_use,
                     "messages": messages,
-                    "temperature": temperature,
                 }
 
-                # GPT-5 uses max_completion_tokens instead of max_tokens
+                # GPT-5 models: use max_completion_tokens, don't pass temperature (only default 1 is supported)
                 if "gpt-5" in model_id:
                     request_params["max_completion_tokens"] = max_tokens
+                    # Don't pass temperature - GPT-5 only supports default of 1
                 else:
                     request_params["max_tokens"] = max_tokens
+                    request_params["temperature"] = temperature
 
                 # Add tools if provided
                 if tools:
@@ -272,10 +300,15 @@ class OpenAIRuntime:
         # Note: GPT-5 thinking mode may differ from Claude's implementation
         # For now, we'll use standard function calling
 
+        # Adjust temperature for thinking mode (matching bedrock.py behavior)
+        temp_value = temperature
+        if use_thinking:
+            temp_value = 1.0  # Thinking mode requires temperature = 1
+
         messages = [{"role": "user", "content": prompt}]
 
         response, _ = self._invoke_with_retry(
-            model_id, messages, tools=tools, max_tokens=max_tokens, temperature=temperature
+            model_id, messages, tools=tools, max_tokens=max_tokens, temperature=temp_value
         )
 
         # Extract tool call from response

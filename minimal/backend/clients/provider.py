@@ -21,7 +21,7 @@ OPENAI_MODELS = {
     "weak": "gpt-5-nano"
 }
 
-def get_model_provider(provider: str = "anthropic") -> Tuple[Any, Dict[str, str]]:
+def get_model_provider(provider: str = "openai") -> Tuple[Any, Dict[str, str]]:
     """
     Get the appropriate client and model IDs for the specified provider.
 
@@ -56,7 +56,7 @@ def get_model_provider(provider: str = "anthropic") -> Tuple[Any, Dict[str, str]
 
     return client, models
 
-def get_provider_info(provider: str = "anthropic") -> Dict[str, Any]:
+def get_provider_info(provider: str = "openai") -> Dict[str, Any]:
     """
     Get information about a provider's models without initializing the client.
 
