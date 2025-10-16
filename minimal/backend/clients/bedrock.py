@@ -234,7 +234,7 @@ class BedrockRuntime:
         """Invoke model with tools, retry logic and cost tracking"""
         temp_value = temperature
         if use_thinking:
-            temp_value = 1.0  # Thinking mode requires temperature = 1 per Claude Extended Thinking spec
+            temp_value = 1.0  # Claude Extended Thinking requires temperature = 1
         body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": max_tokens,
@@ -243,7 +243,14 @@ class BedrockRuntime:
             "temperature": temp_value,
         }
         if use_thinking:
-            body["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+            # Claude requires budget_tokens < max_tokens; we cap at 1024 for stability.
+            effective_budget = min(1024, max_tokens - 1)
+            if effective_budget <= 0:
+                raise ValueError("max_tokens must be greater than 1 when extended thinking is enabled.")
+            body["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": effective_budget,
+            }
 
         data, _ = self._invoke_with_retry(model_id, body)
         for content in data.get("content", []):
