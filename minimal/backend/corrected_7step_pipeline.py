@@ -1221,8 +1221,71 @@ class CorrectedSevenStepPipeline:
                 print(f"✅ SUCCESS: Achieved differentiation in {result.total_attempts} attempts")
                 if result.weak_model_failures:
                     print(f"   Weak model failures: {', '.join(result.weak_model_failures)}")
-            else:
-                print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
+                else:
+                    print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
+                
+                # Save results
+                # self.save_results(results)
+                return results
+            
+            def save_results(self, results: List[SevenStepResult]):        '''Save comprehensive results'''
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Convert to serializable format
+        results_data = []
+        for result in results:
+            steps_data = []
+            for step in result.steps_completed:
+                steps_data.append({
+                    "step_number": step.step_number,
+                    "step_name": step.step_name,
+                    "model_used": step.model_used,
+                    "success": step.success,
+                    "timestamp": step.timestamp,
+                    "response_length": len(step.response)
+                })
+            
+            results_data.append({
+                "topic": result.topic,
+                "subtopic": result.subtopic,
+                "difficulty": result.difficulty,
+                "final_success": result.final_success,
+                "stopped_at_step": result.stopped_at_step,
+                "differentiation_achieved": result.differentiation_achieved,
+                "student_assessment_created": result.student_assessment_created,
+                "total_attempts": result.total_attempts,
+                "weak_model_failures": result.weak_model_failures,
+                "steps_completed": steps_data
+            })
+        
+        final_data = {
+            "pipeline_version": "corrected_7step_v1",
+            "run_info": {
+                "timestamp": datetime.now().isoformat(),
+                "total_topics": len(results),
+                "model_config": {
+                    "opus": self.model_opus,
+                    "sonnet": self.model_sonnet,
+                    "haiku": self.model_haiku
+                }
+            },
+            "results": results_data,
+            "summary": {
+                "topics_with_differentiation": len([r for r in results if r.differentiation_achieved]),
+                "topics_stopped_at_step6": len([r for r in results if r.stopped_at_step == 6]),
+                "average_attempts": sum(r.total_attempts for r in results) / len(results) if results else 0,
+                "full_pipeline_success_rate": len([r for r in results if r.final_success]) / len(results) if results else 0,
+                "common_weak_model_failures": self._extract_common_failures(results)
+            }
+        }
+        
+        filename = os.path.join(self.script_dir, f"corrected_7step_results_{timestamp}.json")
+        with open(filename, "w") as f:
+            json.dump(final_data, f, indent=2)
+        
+        print(f"\n📊 Results saved to: {filename}")
+        print(f"📝 Detailed logs in: {self.log_file}")
+        print(f"💾 Full step data stored in database: {self.db_path}")
 
         # Save results
         # self.save_results(results)
