@@ -201,7 +201,7 @@ async def get_models():
                 },
                 "mid": {
                     "id": p.model_mid,
-                    "description": "Claude Sonnet 4.5 - Used for difficulty categories (Step 1), error catalog (Step 2), and mid-tier implementation (Step 4)",
+                    "description": "Claude Sonnet 4.5 - Used for difficulty categories (Step 1) and mid-tier implementation (Step 4)",
                     "purpose": "Competent implementation baseline, category generation"
                 },
                 "weak": {
@@ -210,7 +210,7 @@ async def get_models():
                     "purpose": "Generate realistic errors for assessment creation"
                 }
             },
-            "pipeline_flow": "Steps 1-2: Mid (Sonnet 4.5) → Step 3: Strong (Opus 4.1) → Step 4: Mid → Step 5: Weak (Haiku 4.5) → Steps 6-7: Strong"
+            "pipeline_flow": "Step 1: Mid (Sonnet 4.5) → Step 2-3: Strong (Opus 4.1) → Step 4: Mid → Step 5: Weak (Haiku 4.5) → Steps 6-7: Strong"
         }
     except Exception as e:
         logger.exception("Failed to get model info")

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 from openai import OpenAI, AzureOpenAI
-from openai import APIError, RateLimitError, APIConnectionError
+from openai import APIError, RateLimitError, APIConnectionError, BadRequestError
 
 # Load environment variables from .env file
 try:
@@ -36,6 +36,8 @@ def convert_anthropic_to_openai_tools(tools: List[Dict[str, Any]]) -> List[Dict[
     Convert Anthropic tool definitions to OpenAI function calling format.
     Detects if tools are already in OpenAI format and skips conversion.
 
+    Enables OpenAI's structured outputs (strict mode) for guaranteed schema compliance.
+
     Anthropic format:
     {
         "name": "tool_name",
@@ -47,16 +49,18 @@ def convert_anthropic_to_openai_tools(tools: List[Dict[str, Any]]) -> List[Dict[
         }
     }
 
-    OpenAI format:
+    OpenAI format (with strict mode):
     {
         "type": "function",
         "function": {
             "name": "tool_name",
             "description": "Tool description",
+            "strict": true,
             "parameters": {
                 "type": "object",
                 "properties": {...},
-                "required": [...]
+                "required": [...],
+                "additionalProperties": false
             }
         }
     }
@@ -74,18 +78,23 @@ def convert_anthropic_to_openai_tools(tools: List[Dict[str, Any]]) -> List[Dict[
             continue
 
         # Convert from Anthropic format
+        input_schema = tool.get("input_schema", {})
+
+        # Ensure additionalProperties: false at root level if it's an object schema
+        # (nested objects should already have this from tools.json)
+        if isinstance(input_schema, dict) and input_schema.get("type") == "object":
+            if "additionalProperties" not in input_schema:
+                input_schema = {**input_schema, "additionalProperties": False}
+
         openai_tool = {
             "type": "function",
             "function": {
                 "name": tool.get("name", ""),
-                "description": tool.get("description", "")
+                "description": tool.get("description", ""),
+                "strict": True,  # Enable structured outputs for 100% schema compliance
+                "parameters": input_schema
             }
         }
-
-        # Convert input_schema to parameters
-        input_schema = tool.get("input_schema", {})
-        if isinstance(input_schema, dict):
-            openai_tool["function"]["parameters"] = input_schema
 
         openai_tools.append(openai_tool)
 
@@ -110,6 +119,7 @@ class OpenAIRuntime:
         self._client: Optional[Union[OpenAI, AzureOpenAI]] = None
         self._is_azure = False
         self._azure_default_deployment: Optional[str] = None
+        self._azure_api_version: Optional[str] = None
         self._import_error: Optional[Exception] = None
 
         try:
@@ -120,7 +130,8 @@ class OpenAIRuntime:
             if azure_endpoint and azure_api_key:
                 # Azure OpenAI configuration
                 self._is_azure = True
-                api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-05-01-preview")
+                # Hardcode current required API version; environment can override if needed.
+                api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
                 endpoint = azure_endpoint.rstrip("/")
 
                 self._client = AzureOpenAI(
@@ -128,6 +139,7 @@ class OpenAIRuntime:
                     azure_endpoint=endpoint,
                     api_version=api_version,
                 )
+                self._azure_api_version = api_version
                 self._azure_default_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT")
                 if not self._azure_default_deployment:
                     logger.warning(
@@ -220,7 +232,6 @@ class OpenAIRuntime:
             log_msg += f" ({reasoning_tokens} reasoning)"
         log_msg += f", cost: ${metrics.total_cost_usd:.4f}, time: {metrics.response_time_ms}ms"
         logger.info(log_msg)
-
         return metrics
 
     def _invoke_with_retry(
@@ -228,8 +239,8 @@ class OpenAIRuntime:
         model_id: str,
         messages: List[Dict[str, Any]],
         tools: Optional[List[Dict[str, Any]]] = None,
-        max_tokens: int = 2048,
         temperature: float = 0.0,
+        reasoning_effort: str = "medium",
         max_retries: int = 5,
         base_delay: float = 2.0
     ) -> Tuple[Any, UsageMetrics]:
@@ -259,19 +270,31 @@ class OpenAIRuntime:
                     "messages": messages,
                 }
 
-                # GPT-5 models: use max_completion_tokens, don't pass temperature (only default 1 is supported)
+                # GPT-5 models: don't pass temperature (only default 1 is supported)
+                # Set reasoning_effort directly (low or medium)
                 if "gpt-5" in model_id:
-                    request_params["max_completion_tokens"] = max_tokens
-                    # Don't pass temperature - GPT-5 only supports default of 1
+                    request_params["reasoning_effort"] = reasoning_effort
                 else:
-                    request_params["max_tokens"] = max_tokens
                     request_params["temperature"] = temperature
 
                 # Add tools if provided (convert Anthropic format to OpenAI format)
                 if tools:
                     converted_tools = convert_anthropic_to_openai_tools(tools)
                     request_params["tools"] = converted_tools
-                    request_params["tool_choice"] = "required"
+                    # Disable parallel tool calls (required when using strict mode)
+                    request_params["parallel_tool_calls"] = False
+
+                    force_required = True
+                    if self._is_azure:
+                        version = self._azure_api_version
+                        try:
+                            version_parts = tuple(int(part) for part in (version or "").split("-")[:3])
+                            min_required = (2024, 6, 1)
+                            force_required = version_parts >= min_required
+                        except Exception:
+                            force_required = False
+                    if force_required:
+                        request_params["tool_choice"] = "required"
 
                 response = client.chat.completions.create(**request_params)
 
@@ -289,6 +312,19 @@ class OpenAIRuntime:
                 logger.warning(f"Rate limit error on attempt {attempt + 1}/{max_retries + 1}. "
                              f"Retrying in {delay:.2f}s...")
                 time.sleep(delay)
+
+            except BadRequestError as e:
+                # Schema validation or parameter errors - usually not retriable
+                logger.error(f"BadRequestError on model {model_id}: {e}")
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        error_details = e.response.json()
+                        logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+                    except Exception:
+                        logger.error(f"Error details: {str(e)}")
+                else:
+                    logger.error(f"Error message: {str(e)}")
+                raise  # Don't retry schema/parameter errors
 
             except (APIError, APIConnectionError) as e:
                 if attempt == max_retries:
@@ -339,19 +375,35 @@ class OpenAIRuntime:
         self,
         model_id: str,
         prompt: str,
-        max_tokens: int = 2048,
         temperature: float = 0.0,
+        reasoning_effort: str = "low",
     ) -> str:
         """Invoke model with retry logic and cost tracking"""
         messages = [{"role": "user", "content": prompt}]
 
         response, _ = self._invoke_with_retry(
-            model_id, messages, max_tokens=max_tokens, temperature=temperature
+            model_id, messages, temperature=temperature, reasoning_effort=reasoning_effort
         )
 
         # Extract text from response
         if response.choices and len(response.choices) > 0:
-            return response.choices[0].message.content or "Error: No content generated."
+            choice = response.choices[0]
+            finish_reason = choice.finish_reason
+            content = choice.message.content
+
+            if content is None:
+                # Log detailed diagnostics when content is missing
+                logger.warning(
+                    f"Model {model_id} returned no content. "
+                    f"finish_reason={finish_reason}, "
+                    f"message={choice.message}"
+                )
+                refusal = getattr(choice.message, 'refusal', None)
+                if refusal:
+                    return f"Error: Content refused by model (reason: {refusal})"
+                return f"Error: No content generated (finish_reason: {finish_reason})"
+
+            return content
 
         return "Error: No response choices."
 
@@ -360,9 +412,8 @@ class OpenAIRuntime:
         model_id: str,
         prompt: str,
         tools: List[Dict[str, Any]],
-        max_tokens: int = 2048,
         use_thinking: bool = False,
-        thinking_budget: int = 2048,
+        reasoning_effort: str = "medium",
         temperature: float = 0.0,
     ) -> Dict[str, Any]:
         """Invoke model with tools, retry logic and cost tracking"""
@@ -377,12 +428,15 @@ class OpenAIRuntime:
         messages = [{"role": "user", "content": prompt}]
 
         response, _ = self._invoke_with_retry(
-            model_id, messages, tools=tools, max_tokens=max_tokens, temperature=temp_value
+            model_id, messages, tools=tools, temperature=temp_value, reasoning_effort=reasoning_effort
         )
 
         # Extract tool call from response
         if response.choices and len(response.choices) > 0:
-            message = response.choices[0].message
+            choice = response.choices[0]
+            message = choice.message
+            finish_reason = choice.finish_reason
+
             if message.tool_calls and len(message.tool_calls) > 0:
                 tool_call = message.tool_calls[0]
                 try:
@@ -390,4 +444,20 @@ class OpenAIRuntime:
                 except json.JSONDecodeError:
                     return {"error": "Failed to parse tool call arguments"}
 
-        return {"error": "No tool call found in response"}
+            # Log detailed info when tool call missing
+            logger.warning(
+                f"Model {model_id} did not return tool call. "
+                f"finish_reason={finish_reason}, "
+                f"has_content={message.content is not None}, "
+                f"refusal={getattr(message, 'refusal', None)}"
+            )
+            if message.content:
+                logger.info(f"Model returned text instead: {message.content[:200]}...")
+
+            refusal = getattr(message, 'refusal', None)
+            if refusal:
+                return {"error": f"Tool call refused by model: {refusal}"}
+
+            return {"error": f"No tool call found (finish_reason: {finish_reason})"}
+
+        return {"error": "No response choices"}
