@@ -3,9 +3,9 @@ services:
     name: aqumen-backend
     env: python
     region: oregon
-    plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    plan: free
+    buildCommand: pip install -r minimal/backend/requirements.txt
+    startCommand: cd minimal/backend && uvicorn api_server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: AWS_ACCESS_KEY_ID
         sync: false

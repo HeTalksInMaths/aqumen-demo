@@ -43,6 +43,8 @@ def main(topics, *, parallel: bool = False, max_workers: int = DEFAULT_WORKERS):
         print("No topics provided to run.")
         return
 
+    parallel = "--parallel" in sys.argv
+
     print(f"Starting batch run with {len(topics)} topics...")
     print("Running in parallel mode." if parallel else "Running in sequential mode.")
     start_time = time.time()

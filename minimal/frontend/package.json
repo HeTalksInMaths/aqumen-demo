@@ -15,7 +15,7 @@
     "test:screenshot": "playwright test ../tests/e2e/debug-helper.spec.ts -g screenshot",
     "test:report": "playwright show-report",
     "test:codegen": "playwright codegen http://localhost:5173",
-    "test:colors": "playwright test tests/e2e/color-rendering.spec.ts"
+    "test": "node --test ../../code_testing/frontend/tests/api.test.mjs"
   },
   "dependencies": {
     "lucide-react": "latest",
