@@ -1,5 +1,7 @@
 # FastAPI Backend Requirements
 # For the API server that provides SSE streaming
+# Python version: 3.11+
+python_version >= "3.11"
 
 # Core API framework
 fastapi==0.109.0
