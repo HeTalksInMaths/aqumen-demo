@@ -200,12 +200,12 @@ class Repo:
         placeholder = "%s" if self.use_postgres else "?"
 
         if self.use_postgres:
-            # PostgreSQL uses ON CONFLICT
+            # PostgreSQL uses ON CONFLICT - target the composite PK
             cursor.execute(
                 f"""
                 INSERT INTO enhanced_pipeline_runs (run_timestamp, topic)
                 VALUES ({placeholder}, {placeholder})
-                ON CONFLICT (run_timestamp) DO NOTHING
+                ON CONFLICT (run_timestamp, topic) DO NOTHING
                 """,
                 (run_timestamp, topic),
             )

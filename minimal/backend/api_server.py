@@ -12,6 +12,7 @@ This file remains as the entry point for backward compatibility.
 """
 
 # Import the FastAPI app from the new modular structure
+from api.main import app
 
 # Import all endpoints to register them with the app
 import api.endpoints  # noqa: F401

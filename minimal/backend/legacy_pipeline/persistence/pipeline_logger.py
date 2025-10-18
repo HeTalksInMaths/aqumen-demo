@@ -185,11 +185,7 @@ class PipelineLogger:
         )
 
     def _save_reward_to_database(self, step_number: int, report: StepRewardsReport) -> None:
-        """Save reward metrics to database."""
-        import sqlite3
-
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        """Save reward metrics to database via Repo."""
         details = [
             {
                 "name": result.name,
@@ -198,18 +194,11 @@ class PipelineLogger:
             }
             for result in report.results
         ]
-        cursor.execute(
-            """
-            INSERT INTO step_rewards (run_timestamp, step_number, pass_rate, num_tests, detail_json)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                self.run_timestamp,
-                step_number,
-                float(report.pass_rate),
-                len(details),
-                json.dumps(details),
-            ),
+        
+        # Use Repo to save rewards (supports both SQLite and Postgres)
+        self.repo.save_rewards(
+            run_timestamp=self.run_timestamp,
+            step_number=step_number,
+            pass_rate=float(report.pass_rate),
+            details=details,
         )
-        conn.commit()
-        conn.close()

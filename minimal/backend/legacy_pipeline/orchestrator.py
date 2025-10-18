@@ -78,14 +78,14 @@ class LegacyPipelineOrchestrator:
         # Go up one level from legacy_pipeline to backend
         self.script_dir = os.path.dirname(script_dir)
 
-        # Generate timestamped identifier for this run
-        self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Timestamp will be regenerated for each run to avoid collisions
+        self.run_timestamp = None
 
         # Initialize database path
         self.db_path = os.path.join(self.script_dir, "pipeline_results.db")
 
-        # Initialize logger
-        self.logger = PipelineLogger(self.script_dir, self.run_timestamp, self.db_path)
+        # Logger will be initialized per run
+        self.logger = None
 
         # Load prompts and tools
         try:
@@ -136,6 +136,10 @@ class LegacyPipelineOrchestrator:
         Returns:
             SevenStepResult with complete execution details
         """
+        # Generate fresh timestamp for this run to avoid collisions
+        self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.logger = PipelineLogger(self.script_dir, self.run_timestamp, self.db_path)
+
         logger.info(f"Starting corrected 7-step pipeline for: {topic}")
 
         # Initialize logging
@@ -311,6 +315,10 @@ class LegacyPipelineOrchestrator:
             PipelineStep objects as each step completes
             Final yield contains dict with final result including all metadata
         """
+        # Generate fresh timestamp for this run to avoid collisions
+        self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.logger = PipelineLogger(self.script_dir, self.run_timestamp, self.db_path)
+
         logger.info(f"Starting streaming 7-step pipeline for: {topic}")
 
         # Initialize logging

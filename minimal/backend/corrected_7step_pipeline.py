@@ -47,10 +47,16 @@ class CorrectedSevenStepPipeline:
         self.judge_supports_thinking = self._orchestrator.judge_supports_thinking
         self.invoker = self._orchestrator.invoker
         self.script_dir = self._orchestrator.script_dir
-        self.run_timestamp = self._orchestrator.run_timestamp
         self.db_path = self._orchestrator.db_path
         self.prompts = self._orchestrator.prompts
         self.tools = self._orchestrator.tools
+
+        # These will be set on each run now (lazy initialization)
+        self.run_timestamp = None
+        self.logger = None
+        self.log_file = None
+        self.results_file = None
+        self.repo = None
 
         # Expose Bedrock-specific attributes for backward compatibility
         if provider == "anthropic":
@@ -67,11 +73,6 @@ class CorrectedSevenStepPipeline:
         self.min_error_span = self._orchestrator.config.MIN_ERROR_SPAN
         self.max_error_span = self._orchestrator.config.MAX_ERROR_SPAN
 
-        # Expose repo for backward compatibility
-        self.repo = self._orchestrator.logger.repo
-        self.log_file = self._orchestrator.logger.log_file
-        self.results_file = self._orchestrator.logger.results_file
-
     def run_full_pipeline(self, topic: str, max_attempts: int = 3) -> SevenStepResult:
         """
         Run the complete corrected 7-step pipeline.
@@ -83,7 +84,15 @@ class CorrectedSevenStepPipeline:
         Returns:
             SevenStepResult with complete execution details
         """
-        return self._orchestrator.run_full_pipeline(topic, max_attempts)
+        result = self._orchestrator.run_full_pipeline(topic, max_attempts)
+        # Sync lazy-initialized attributes back to wrapper for backward compatibility
+        self.run_timestamp = self._orchestrator.run_timestamp
+        self.logger = self._orchestrator.logger
+        if self.logger:
+            self.log_file = self.logger.log_file
+            self.results_file = self.logger.results_file
+            self.repo = self.logger.repo
+        return result
 
     def run_full_pipeline_streaming(self, topic: str, max_attempts: int = 3):
         """
@@ -99,7 +108,15 @@ class CorrectedSevenStepPipeline:
             PipelineStep objects as each step completes
             Final yield contains dict with final result including all metadata
         """
-        yield from self._orchestrator.run_full_pipeline_streaming(topic, max_attempts)
+        for step_or_result in self._orchestrator.run_full_pipeline_streaming(topic, max_attempts):
+            yield step_or_result
+        # Sync lazy-initialized attributes back to wrapper for backward compatibility
+        self.run_timestamp = self._orchestrator.run_timestamp
+        self.logger = self._orchestrator.logger
+        if self.logger:
+            self.log_file = self.logger.log_file
+            self.results_file = self.logger.results_file
+            self.repo = self.logger.repo
 
     def run_batch_test(self, topics: list[str]) -> list[SevenStepResult]:
         """
@@ -136,6 +153,15 @@ class CorrectedSevenStepPipeline:
             raise KeyError(f"Prompt template missing for step '{step_key}'")
 
         return template
+
+    def step1_generate_difficulty_categories(self, topic: str) -> tuple[bool, dict, "PipelineStep"]:
+        """Execute Step 1: Generate difficulty categories (exposed for API)."""
+        success, categories, step1, _ = self._orchestrator.step1.execute(topic)
+        return success, categories, step1
+
+    def invoke_model(self, model_id: str, prompt: str, max_tokens: int = 2048, temperature: float = 0.0) -> str:
+        """Invoke a model directly (exposed for testing)."""
+        return self._orchestrator.invoker.text(model_id, prompt, max_tokens)
 
 
 def main():
