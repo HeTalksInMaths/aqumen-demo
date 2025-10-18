@@ -7,9 +7,9 @@ class Invoker:
     def __init__(self, runtime: BedrockRuntime):
         self.runtime = runtime
 
-    def text(self, model_id: str, prompt: str, max_tokens: int = 2048) -> str:
+    def text(self, model_id: str, prompt: str, reasoning_effort: str = "low") -> str:
         try:
-            return self.runtime.invoke(model_id, prompt, max_tokens)
+            return self.runtime.invoke(model_id, prompt, reasoning_effort=reasoning_effort)
         except Exception as exc:  # pragma: no cover - runtime safeguard
             return f"Error: {exc}"
 
@@ -18,18 +18,16 @@ class Invoker:
         model_id: str,
         prompt: str,
         tools: List[Dict[str, Any]],
-        max_tokens: int = 2048,
         use_thinking: bool = False,
-        thinking_budget: int = 2048,
+        reasoning_effort: str = "medium",
     ) -> Dict[str, Any]:
         try:
             return self.runtime.invoke_with_tools(
                 model_id,
                 prompt,
                 tools,
-                max_tokens=max_tokens,
                 use_thinking=use_thinking,
-                thinking_budget=thinking_budget,
+                reasoning_effort=reasoning_effort,
             )
         except Exception as exc:  # pragma: no cover - runtime safeguard
             return {"error": f"Error: {exc}"}

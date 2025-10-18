@@ -209,6 +209,7 @@ class BedrockRuntime:
         prompt: str,
         max_tokens: int = 2048,
         temperature: float = 0.0,
+        reasoning_effort: str = "low",  # Accepted for compatibility but ignored (Anthropic doesn't use it)
     ) -> str:
         """Invoke model with retry logic and cost tracking"""
         body = {
@@ -228,7 +229,7 @@ class BedrockRuntime:
         tools: List[Dict[str, Any]],
         max_tokens: int = 2048,
         use_thinking: bool = False,
-        thinking_budget: int = 2048,
+        reasoning_effort: str = "low",  # Accepted for compatibility but ignored (Anthropic doesn't use it)
         temperature: float = 0.0,
     ) -> Dict[str, Any]:
         """Invoke model with tools, retry logic and cost tracking"""

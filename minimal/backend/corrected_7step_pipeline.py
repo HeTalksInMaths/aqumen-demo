@@ -60,12 +60,12 @@ class SevenStepResult:
     weak_model_failures: List[str]  # Track actual failure patterns
 
 class CorrectedSevenStepPipeline:
-    def __init__(self, provider: str = "anthropic"):
+    def __init__(self, provider: str = "openai"):
         '''
         Initialize the corrected 7-step pipeline with timestamped logging.
 
         Args:
-            provider: Model provider to use - either "anthropic" (default) or "openai"
+            provider: Model provider to use - either "anthropic" or "openai" (default)
         '''
         self.provider = provider
 
@@ -135,18 +135,17 @@ class CorrectedSevenStepPipeline:
             logger.error(f"Failed to load prompt/tool configuration: {exc}")
             raise
 
-    def invoke_model(self, model_id: str, prompt: str, max_tokens: int = 2048) -> str:
+    def invoke_model(self, model_id: str, prompt: str, reasoning_effort: str = "low") -> str:
         '''Invoke a model via the Bedrock runtime wrapper.'''
-        return self.invoker.text(model_id, prompt, max_tokens=max_tokens)
+        return self.invoker.text(model_id, prompt, reasoning_effort=reasoning_effort)
 
     def invoke_model_with_tools(
         self,
         model_id: str,
         prompt: str,
         tools: List[Dict[str, Any]],
-        max_tokens: int = 2048,
         use_thinking: bool = False,
-        thinking_budget: int = 2048,
+        reasoning_effort: str = "low",
     ) -> Dict[str, Any]:
         '''Invoke a model via the Bedrock runtime wrapper with tool support.'''
         safe_use_thinking = use_thinking and self.judge_supports_thinking
@@ -154,9 +153,8 @@ class CorrectedSevenStepPipeline:
             model_id,
             prompt,
             tools,
-            max_tokens=max_tokens,
             use_thinking=safe_use_thinking,
-            thinking_budget=thinking_budget,
+            reasoning_effort=reasoning_effort,
         )
 
     def log_step(self, step: PipelineStep):
@@ -364,7 +362,7 @@ class CorrectedSevenStepPipeline:
         prompt = template.format(topic=topic)
         tools = self._get_tools("step1_difficulty_categories")
 
-        response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
+        response = self.invoke_model_with_tools(self.model_mid, prompt, tools, reasoning_effort="low")
         step = PipelineStep(1, "Generate difficulty categories", self.model_mid, False, str(response), datetime.now().isoformat())
 
         categories: Dict[str, List[str]] = {}
@@ -402,8 +400,8 @@ class CorrectedSevenStepPipeline:
         prompt = template.format(topic=topic, difficulty=difficulty, subtopic=subtopic)
         tools = self._get_tools("step2_error_catalog")
 
-        response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
-        step = PipelineStep(2, "Generate conceptual error catalog", self.model_mid, False, str(response), datetime.now().isoformat())
+        response = self.invoke_model_with_tools(self.model_strong, prompt, tools, reasoning_effort="low")
+        step = PipelineStep(2, "Generate conceptual error catalog", self.model_strong, False, str(response), datetime.now().isoformat())
 
         errors: List[Dict[str, Any]] = []
         try:
@@ -464,7 +462,7 @@ class CorrectedSevenStepPipeline:
             prompt,
             tools,
             use_thinking=use_thinking,
-            thinking_budget=2048
+            reasoning_effort="low"
         )
         step = PipelineStep(3, "Generate strategic implementation challenge", self.model_strong, False, str(response), datetime.now().isoformat())
 
@@ -515,7 +513,13 @@ class CorrectedSevenStepPipeline:
             success_criteria=question.get('success_criteria', 'Meets requirements with sound reasoning and robustness')
         )
 
-        response = self.invoke_model(self.model_mid, prompt)
+        response = self.invoke_model(self.model_mid, prompt, reasoning_effort="low")
+
+        # Log diagnostic info about response
+        logger.info(f"Step 4 (mid-tier {self.model_mid}) response length: {len(response) if response else 0}")
+        if not response or len(response) < 50:
+            logger.warning(f"Step 4 returned suspiciously short response: {repr(response)[:200]}")
+
         step = PipelineStep(4, "Test Sonnet (mid-tier) implementation", self.model_mid, True, response, datetime.now().isoformat())
 
         self.log_step(step)
@@ -535,7 +539,13 @@ class CorrectedSevenStepPipeline:
             success_criteria=question.get('success_criteria', 'Meets requirements with sound reasoning and robustness')
         )
 
-        response = self.invoke_model(self.model_weak, prompt)
+        response = self.invoke_model(self.model_weak, prompt, reasoning_effort="low")
+
+        # Log diagnostic info about response
+        logger.info(f"Step 5 (weak-tier {self.model_weak}) response length: {len(response) if response else 0}")
+        if not response or len(response) < 50:
+            logger.warning(f"Step 5 returned suspiciously short response: {repr(response)[:200]}")
+
         step = PipelineStep(5, "Test Haiku (weak-tier) implementation", self.model_weak, True, response, datetime.now().isoformat())
 
         self.log_step(step)
@@ -565,7 +575,7 @@ class CorrectedSevenStepPipeline:
         )
         
         tools = self._get_tools("step6_judge_responses")
-        response = self.invoke_model_with_tools(self.model_strong, prompt, tools)
+        response = self.invoke_model_with_tools(self.model_strong, prompt, tools, reasoning_effort="low")
         step = PipelineStep(
             6,
             "Judge implementation differentiation",
@@ -611,6 +621,12 @@ class CorrectedSevenStepPipeline:
             step.success = False
             judge_payload = {}
             failures_weaker = []
+
+        # Log judge decision for debugging
+        logger.info(f"Step 6 Judge Decision:")
+        logger.info(f"  Differentiation achieved: {differentiation_achieved}")
+        logger.info(f"  Failures detected in weak model: {failures_weaker}")
+        logger.info(f"  Reasoning: {judge_payload.get('reasoning', 'N/A')[:300]}")
 
         self.log_step(step)
         catalog_names = [str((entry or {}).get('mistake', '')).strip() for entry in (error_catalog or []) if isinstance(entry, dict)]
@@ -810,7 +826,8 @@ class CorrectedSevenStepPipeline:
                 self.model_strong,
                 prompt,
                 tools,
-                use_thinking=use_thinking
+                use_thinking=use_thinking,
+                reasoning_effort="low"
             )
             step = PipelineStep(
                 7,

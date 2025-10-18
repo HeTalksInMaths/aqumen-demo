@@ -90,12 +90,12 @@ class HealthResponse(BaseModel):
 # Initialize pipeline (singleton pattern for efficiency, keyed by provider)
 pipelines: Dict[str, CorrectedSevenStepPipeline] = {}
 
-def get_pipeline(provider: str = "anthropic") -> CorrectedSevenStepPipeline:
+def get_pipeline(provider: str = "openai") -> CorrectedSevenStepPipeline:
     """
     Lazy initialization of pipeline singleton for specified provider.
 
     Args:
-        provider: Either "anthropic" or "openai" (default: "anthropic")
+        provider: Either "anthropic" or "openai" (default: "openai")
 
     Returns:
         Pipeline instance for the specified provider
@@ -104,21 +104,34 @@ def get_pipeline(provider: str = "anthropic") -> CorrectedSevenStepPipeline:
     if MOCK_PIPELINE:
         raise HTTPException(503, "Pipeline is disabled in mock mode.")
 
+    requested_provider = provider
+
     # Validate provider
-    if provider not in ["anthropic", "openai"]:
-        raise HTTPException(400, f"Invalid provider: {provider}. Must be 'anthropic' or 'openai'")
+    if requested_provider not in ["anthropic", "openai"]:
+        raise HTTPException(400, f"Invalid provider: {requested_provider}. Must be 'anthropic' or 'openai'")
+
+    # If OpenAI credentials are missing, fall back to Anthropic to keep legacy deployments alive.
+    if requested_provider == "openai":
+        has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+        has_azure_creds = bool(os.getenv("AZURE_OPENAI_ENDPOINT") and os.getenv("AZURE_OPENAI_API_KEY"))
+        if not (has_openai_key or has_azure_creds):
+            logger.warning(
+                "OpenAI selected but no OPENAI_API_KEY/Azure credentials found. "
+                "Falling back to Anthropic pipeline to preserve availability."
+            )
+            requested_provider = "anthropic"
 
     # Initialize pipeline for this provider if not already done
-    if provider not in pipelines:
-        logger.info(f"Initializing CorrectedSevenStepPipeline with provider: {provider}...")
+    if requested_provider not in pipelines:
+        logger.info(f"Initializing CorrectedSevenStepPipeline with provider: {requested_provider}...")
         try:
-            pipelines[provider] = CorrectedSevenStepPipeline(provider=provider)
-            logger.info(f"Pipeline initialized successfully for provider: {provider}")
+            pipelines[requested_provider] = CorrectedSevenStepPipeline(provider=requested_provider)
+            logger.info(f"Pipeline initialized successfully for provider: {requested_provider}")
         except Exception as e:
-            logger.error(f"Failed to initialize pipeline for provider '{provider}': {e}")
+            logger.error(f"Failed to initialize pipeline for provider '{requested_provider}': {e}")
             raise HTTPException(500, f"Failed to initialize pipeline: {str(e)}")
 
-    return pipelines[provider]
+    return pipelines[requested_provider]
 
 @app.on_event("startup")
 async def startup_event():
@@ -188,7 +201,7 @@ async def get_models():
                 },
                 "mid": {
                     "id": p.model_mid,
-                    "description": "Claude Sonnet 4.5 - Used for difficulty categories (Step 1), error catalog (Step 2), and mid-tier implementation (Step 4)",
+                    "description": "Claude Sonnet 4.5 - Used for difficulty categories (Step 1) and mid-tier implementation (Step 4)",
                     "purpose": "Competent implementation baseline, category generation"
                 },
                 "weak": {
@@ -197,7 +210,7 @@ async def get_models():
                     "purpose": "Generate realistic errors for assessment creation"
                 }
             },
-            "pipeline_flow": "Steps 1-2: Mid (Sonnet 4.5) → Step 3: Strong (Opus 4.1) → Step 4: Mid → Step 5: Weak (Haiku 4.5) → Steps 6-7: Strong"
+            "pipeline_flow": "Step 1: Mid (Sonnet 4.5) → Step 2-3: Strong (Opus 4.1) → Step 4: Mid → Step 5: Weak (Haiku 4.5) → Steps 6-7: Strong"
         }
     except Exception as e:
         logger.exception("Failed to get model info")
@@ -207,7 +220,7 @@ async def get_models():
 async def generate_stream(
     topic: str = Query(..., description="AI/ML topic for question generation", min_length=3),
     max_retries: int = Query(3, description="Max retries for hard question", ge=1, le=5),
-    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
+    provider: str = Query("openai", description="Model provider: 'anthropic' or 'openai'")
 ):
     """
     Stream the 7-step pipeline execution in real-time using Server-Sent Events (SSE).
@@ -275,7 +288,7 @@ async def generate_stream(
 @app.post("/api/generate", response_model=QuestionResponse)
 async def generate_question(
     request: GenerateRequest,
-    provider: str = Query("anthropic", description="Model provider: 'anthropic' or 'openai'")
+    provider: str = Query("openai", description="Model provider: 'anthropic' or 'openai'")
 ):
     """
     Generate a complete question (blocking).
@@ -508,11 +521,11 @@ async def step1_categories(request: dict):
     Request body:
     {
         "topic": "AI/ML topic for categorization",
-        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
+        "provider": "anthropic" | "openai" (optional, defaults to "openai")
     }
     """
     topic = request.get("topic")
-    provider = request.get("provider", "anthropic")
+    provider = request.get("provider", "openai")
 
     if not topic or len(topic.strip()) < 3:
         raise HTTPException(
@@ -569,10 +582,10 @@ async def test_models(request: dict = {}):
 
     Request body (optional):
     {
-        "provider": "anthropic" | "openai" (optional, defaults to "anthropic")
+        "provider": "anthropic" | "openai" (optional, defaults to "openai")
     }
     """
-    provider = request.get("provider", "anthropic") if request else "anthropic"
+    provider = request.get("provider", "openai") if request else "openai"
     logger.info(f"Testing all three models for provider: {provider}...")
 
     try:
