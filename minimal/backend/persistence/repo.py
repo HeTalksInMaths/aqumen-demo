@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     import psycopg2
@@ -82,7 +82,7 @@ class Repo:
         id_type = "SERIAL PRIMARY KEY" if self.use_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
         cursor.execute(
-            f"""
+            """
             CREATE TABLE IF NOT EXISTS enhanced_pipeline_runs (
                 run_timestamp TEXT NOT NULL,
                 topic TEXT NOT NULL,
@@ -172,7 +172,7 @@ class Repo:
         run_timestamp: str,
         step_number: int,
         pass_rate: float,
-        details: List[Dict[str, Any]],
+        details: list[dict[str, Any]],
     ) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -200,12 +200,12 @@ class Repo:
         placeholder = "%s" if self.use_postgres else "?"
 
         if self.use_postgres:
-            # PostgreSQL uses ON CONFLICT
+            # PostgreSQL uses ON CONFLICT - target the composite PK
             cursor.execute(
                 f"""
                 INSERT INTO enhanced_pipeline_runs (run_timestamp, topic)
                 VALUES ({placeholder}, {placeholder})
-                ON CONFLICT (run_timestamp) DO NOTHING
+                ON CONFLICT (run_timestamp, topic) DO NOTHING
                 """,
                 (run_timestamp, topic),
             )

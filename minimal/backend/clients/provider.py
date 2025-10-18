@@ -4,7 +4,8 @@ Multi-provider model configuration and selection.
 Supports switching between Anthropic (via AWS Bedrock) and OpenAI models
 for the 3-tier pipeline architecture.
 """
-from typing import Dict, Tuple, Any
+from typing import Any
+
 from .bedrock import BedrockRuntime
 from .openai_client import OpenAIRuntime
 
@@ -21,7 +22,7 @@ OPENAI_MODELS = {
     "weak": "gpt-5-nano"
 }
 
-def get_model_provider(provider: str = "anthropic") -> Tuple[Any, Dict[str, str]]:
+def get_model_provider(provider: str = "anthropic") -> tuple[Any, dict[str, str]]:
     """
     Get the appropriate client and model IDs for the specified provider.
 
@@ -56,7 +57,7 @@ def get_model_provider(provider: str = "anthropic") -> Tuple[Any, Dict[str, str]
 
     return client, models
 
-def get_provider_info(provider: str = "anthropic") -> Dict[str, Any]:
+def get_provider_info(provider: str = "anthropic") -> dict[str, Any]:
     """
     Get information about a provider's models without initializing the client.
 

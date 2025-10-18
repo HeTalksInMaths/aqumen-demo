@@ -3,6 +3,7 @@ Test Step 7 improvements with LLM Rubrics for Content Marketing Generation topic
 """
 
 import logging
+
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
 # Set up logging to see auto-fix messages

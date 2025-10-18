@@ -3,9 +3,10 @@ Test Step 7 directly with outputs from the Content Marketing run
 This allows us to test the Step 7 improvements without running the full pipeline
 """
 
-import sqlite3
 import json
 import logging
+import sqlite3
+
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
 # Set up logging to see auto-fix messages

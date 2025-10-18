@@ -1,28 +1,34 @@
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
-from ..roles import load_model_roles
+from ..analytics.rewards import (
+    rewards_step1,
+    rewards_step2,
+    rewards_step3,
+    rewards_step6,
+    rewards_step7,
+    rewards_step45,
+)
 from ..clients.bedrock import BedrockRuntime
+from ..config import BACKEND_DIR, LOG_DIR_ARCHIVED, LOG_DIR_CURRENT, RESULTS_DIR, SQLITE_DB_PATH, STEP7_MAX_ATTEMPTS
+from ..datatypes import PipelineStep
+from ..persistence.repo import Repo
+from ..prompts import builders as P
+from ..roles import load_model_roles
 from ..services.invoke import Invoker
 from ..tools.schemas import (
-    difficulty_categories_tool, error_catalog_tool, strategic_question_tool,
-    judge_decision_tool, student_assessment_tool
+    difficulty_categories_tool,
+    error_catalog_tool,
+    judge_decision_tool,
+    strategic_question_tool,
+    student_assessment_tool,
 )
-from ..prompts import builders as P
 from ..validators.assessment import validate_assessment_payload
-from ..analytics.rewards import (
-    rewards_step1, rewards_step2, rewards_step3, rewards_step45, rewards_step6, rewards_step7,
-)
-from ..persistence.repo import Repo
-from ..datatypes import PipelineStep
-from ..config import (
-    LOG_DIR_CURRENT, LOG_DIR_ARCHIVED, RESULTS_DIR, BACKEND_DIR, SQLITE_DB_PATH,
-    STEP7_MAX_ATTEMPTS
-)
 
-def ensure_dirs(dirs: List[str]):
+
+def ensure_dirs(dirs: list[str]):
     for d in dirs:
         os.makedirs(d, exist_ok=True)
 
@@ -50,7 +56,7 @@ class Orchestrator:
         self.repo.save_rewards(self.run_ts, step, report.pass_rate, details)
         metrics_path = f"{RESULTS_DIR}/metrics_{self.run_ts}.json"
         if os.path.exists(metrics_path):
-            with open(metrics_path, "r", encoding="utf-8") as f:
+            with open(metrics_path, encoding="utf-8") as f:
                 existing = json.load(f)
         else:
             existing = {"run_ts": self.run_ts, "steps": {}}
@@ -64,7 +70,7 @@ class Orchestrator:
                             step.model_used, step.success, step.response, step.timestamp)
 
     # Step 1
-    def step1(self, topic: str) -> Tuple[bool, Dict[str, List[str]], PipelineStep]:
+    def step1(self, topic: str) -> tuple[bool, dict[str, list[str]], PipelineStep]:
         self.topic = topic
         self.repo.mark_run_start(self.run_ts, topic)
         prompt = P.p_step1_difficulty(topic)
@@ -94,7 +100,7 @@ class Orchestrator:
         return ok, (resp if isinstance(resp, dict) else {}), step
 
     # Step 3
-    def step3(self, topic: str, subtopic: str, difficulty: str, catalog: Dict[str, Any], previous_failures: List[str]):
+    def step3(self, topic: str, subtopic: str, difficulty: str, catalog: dict[str, Any], previous_failures: list[str]):
         names = [e.get("mistake","") for e in catalog.get("errors", [])]
         prompt = P.p_step3_strategic(topic, subtopic, difficulty, names, previous_failures)
         tool = strategic_question_tool()
@@ -107,7 +113,7 @@ class Orchestrator:
         return ok, (resp if isinstance(resp, dict) else {}), step
 
     # Step 4
-    def step4(self, question: Dict[str, Any]):
+    def step4(self, question: dict[str, Any]):
         prompt = P.p_step4_or_5_producer(question)
         text = self.inv.text(self.roles["mid"].id, prompt)
         step = PipelineStep(4, "Produce mid-tier implementation", self.roles["mid"].id, True, text, datetime.now().isoformat())
@@ -117,7 +123,7 @@ class Orchestrator:
         return True, text, step
 
     # Step 5
-    def step5(self, question: Dict[str, Any]):
+    def step5(self, question: dict[str, Any]):
         prompt = P.p_step4_or_5_producer(question)
         text = self.inv.text(self.roles["weak"].id, prompt)
         step = PipelineStep(5, "Produce weak-tier implementation", self.roles["weak"].id, True, text, datetime.now().isoformat())
@@ -127,7 +133,7 @@ class Orchestrator:
         return True, text, step
 
     # Step 6
-    def step6(self, question: Dict[str, Any], catalog: Dict[str, Any], mid_text: str, weak_text: str):
+    def step6(self, question: dict[str, Any], catalog: dict[str, Any], mid_text: str, weak_text: str):
         def rank_key(e):
             impact_rank = {"Minor":0,"Moderate":1,"Major":2}.get(e.get("impact"),0)
             return (impact_rank, float(e.get("likelihood_weak_makes",0.0)))
@@ -146,8 +152,8 @@ class Orchestrator:
         return ok, (resp if isinstance(resp, dict) else {}), step
 
     # Step 7
-    def step7(self, topic: str, subtopic: str, question: Dict[str, Any],
-              mid_text: str, weak_text: str, judge_obj: Dict[str, Any]):
+    def step7(self, topic: str, subtopic: str, question: dict[str, Any],
+              mid_text: str, weak_text: str, judge_obj: dict[str, Any]):
         failures_weaker = judge_obj.get("failures_weaker", [])
         target_names = question.get("target_error_patterns", [])
         last_step = None
@@ -168,6 +174,6 @@ class Orchestrator:
                 return True, sanitized, step
         return False, json.loads(last_step.response), last_step
 
-    def mark_end(self, steps_completed: List[PipelineStep], differentiation: bool, final_success: bool):
+    def mark_end(self, steps_completed: list[PipelineStep], differentiation: bool, final_success: bool):
         self.repo.mark_run_end(self.run_ts, total_steps=len(steps_completed),
                                differentiation_achieved=differentiation, final_success=final_success)

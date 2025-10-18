@@ -12,7 +12,7 @@ from pathlib import Path
 
 def load_pipeline_result(results_file: str) -> dict:
     """Load a pipeline result JSON file."""
-    with open(results_file, 'r') as f:
+    with open(results_file) as f:
         return json.load(f)
 
 

@@ -9,7 +9,6 @@ import json
 import sqlite3
 import sys
 from pathlib import Path
-from typing import List, Dict, Tuple
 
 
 def connect_to_database(db_path: str) -> sqlite3.Connection:
@@ -17,7 +16,7 @@ def connect_to_database(db_path: str) -> sqlite3.Connection:
     return sqlite3.connect(db_path)
 
 
-def get_pipeline_runs_by_topics(db_path: str, topics: List[str], run_timestamp: str = None) -> List[Dict]:
+def get_pipeline_runs_by_topics(db_path: str, topics: list[str], run_timestamp: str = None) -> list[dict]:
     """
     Get pipeline results from database for specific topics.
 
@@ -91,7 +90,7 @@ def get_pipeline_runs_by_topics(db_path: str, topics: List[str], run_timestamp: 
         conn.close()
 
 
-def create_demo_assessment(run_data: Dict, index: int) -> Dict:
+def create_demo_assessment(run_data: dict, index: int) -> dict:
     """Convert database run data to demo assessment format."""
     # Find step 7 (student assessment creation) to extract actual content
     step_7_data = None
@@ -149,7 +148,7 @@ def create_demo_assessment(run_data: Dict, index: int) -> Dict:
         }
 
 
-def create_pipeline_steps(run_data: Dict, index: int) -> List[Dict]:
+def create_pipeline_steps(run_data: dict, index: int) -> list[dict]:
     """Convert database run steps to demo pipeline steps format."""
     pipeline_steps = []
 
@@ -168,7 +167,7 @@ def create_pipeline_steps(run_data: Dict, index: int) -> List[Dict]:
     return pipeline_steps
 
 
-def load_assessments_from_database(topics: List[str], db_path: str = None, run_timestamp: str = None) -> Tuple[List[Dict], List[Dict]]:
+def load_assessments_from_database(topics: list[str], db_path: str = None, run_timestamp: str = None) -> tuple[list[dict], list[dict]]:
     """
     Load assessments from database for specific topics.
 
@@ -204,14 +203,14 @@ def load_assessments_from_database(topics: List[str], db_path: str = None, run_t
     return assessments, all_pipeline_steps
 
 
-def load_existing_demo_data(output_file: str) -> Tuple[List[Dict], List[Dict]]:
+def load_existing_demo_data(output_file: str) -> tuple[list[dict], list[dict]]:
     """Load existing demo data from file if it exists."""
     try:
         if not Path(output_file).exists():
             return [], []
 
         # Read the existing file and extract data
-        with open(output_file, 'r') as f:
+        with open(output_file) as f:
             content = f.read()
 
         # Simple parsing to extract existing assessments and pipeline steps
@@ -267,7 +266,7 @@ def load_existing_demo_data(output_file: str) -> Tuple[List[Dict], List[Dict]]:
         return [], []
 
 
-def write_demo_data(assessments: List[Dict], pipeline_steps: List[Dict], output_file: str):
+def write_demo_data(assessments: list[dict], pipeline_steps: list[dict], output_file: str):
     """Append demo data to JavaScript file."""
     # Load existing data first
     existing_assessments, existing_pipeline_steps = load_existing_demo_data(output_file)

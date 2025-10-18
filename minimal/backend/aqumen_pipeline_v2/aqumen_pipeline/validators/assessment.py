@@ -1,13 +1,12 @@
 import re
-from typing import Any, Dict, List, Tuple
-from ..config import (
-    ALLOWED_DIFFICULTIES, MIN_CODE_LINES, MAX_CODE_LINES,
-    MIN_ERROR_SPAN, MAX_ERROR_SPAN
-)
+from typing import Any
 
-def validate_assessment_payload(payload: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
+from ..config import ALLOWED_DIFFICULTIES, MAX_CODE_LINES, MAX_ERROR_SPAN, MIN_CODE_LINES, MIN_ERROR_SPAN
+
+
+def validate_assessment_payload(payload: dict[str, Any]) -> tuple[bool, dict[str, Any], list[str]]:
     """Deterministic checks for Step 7 output with small auto-fixes."""
-    errors: List[str] = []
+    errors: list[str] = []
     if not isinstance(payload, dict):
         return False, {}, ["Model did not return a JSON object."]
 
