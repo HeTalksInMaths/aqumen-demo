@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport, rewards_step6
 from legacy_pipeline.models import PipelineStep
@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 class JudgmentStep:
     """Handles Step 6: Judge if differentiation was achieved between implementations."""
 
-    def __init__(
-        self, invoker, model_strong: str, prompts: dict, tools: dict
-    ):
+    def __init__(self, invoker, model_strong: str, prompts: dict, tools: dict):
         """
         Initialize the judgment step.
 
@@ -37,9 +35,7 @@ class JudgmentStep:
         sonnet_response: str,
         haiku_response: str,
         error_catalog: list[dict],
-    ) -> tuple[
-        bool, dict[str, Any], list[str], PipelineStep, Optional[StepRewardsReport]
-    ]:
+    ) -> tuple[bool, dict[str, Any], list[str], PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 6: Judge implementation differentiation.
 
@@ -80,9 +76,7 @@ class JudgmentStep:
             "Judge implementation differentiation",
             self.model_strong,
             False,
-            json.dumps(response)
-            if isinstance(response, (dict, list, str))
-            else str(response),
+            json.dumps(response) if isinstance(response, (dict, list, str)) else str(response),
             datetime.now().isoformat(),
         )
 
@@ -129,13 +123,9 @@ class JudgmentStep:
 
         # Calculate rewards
         catalog_names = [
-            str((entry or {}).get("mistake", "")).strip()
-            for entry in (error_catalog or [])
-            if isinstance(entry, dict)
+            str((entry or {}).get("mistake", "")).strip() for entry in (error_catalog or []) if isinstance(entry, dict)
         ]
-        reward_report = rewards_step6(
-            judge_payload if step.success else {}, catalog_names, haiku_response
-        )
+        reward_report = rewards_step6(judge_payload if step.success else {}, catalog_names, haiku_response)
 
         return (
             differentiation_achieved,

@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport, rewards_step2
 from legacy_pipeline.models import PipelineStep
@@ -30,7 +30,7 @@ class ErrorCatalogStep:
 
     def execute(
         self, topic: str, subtopic: str, difficulty: str
-    ) -> tuple[bool, list[dict], PipelineStep, Optional[StepRewardsReport]]:
+    ) -> tuple[bool, list[dict], PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 2: Generate conceptual error catalog.
 
@@ -42,9 +42,7 @@ class ErrorCatalogStep:
         Returns:
             Tuple of (success, errors_list, pipeline_step, rewards_report)
         """
-        logger.info(
-            f"Step 2: Generating error catalog for {topic} - {subtopic} ({difficulty})"
-        )
+        logger.info(f"Step 2: Generating error catalog for {topic} - {subtopic} ({difficulty})")
 
         template = self._get_prompt_template("step2_error_catalog")
         prompt = template.format(topic=topic, difficulty=difficulty, subtopic=subtopic)

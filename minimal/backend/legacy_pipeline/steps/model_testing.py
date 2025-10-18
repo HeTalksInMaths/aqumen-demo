@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime
-from typing import Optional
 
 from analytics.rewards import StepRewardsReport, rewards_step45
 from legacy_pipeline.models import PipelineStep
@@ -13,9 +12,7 @@ logger = logging.getLogger(__name__)
 class ModelTestingStep:
     """Handles Steps 4-5: Test mid-tier and weak-tier model implementations."""
 
-    def __init__(
-        self, invoker, model_mid: str, model_weak: str, prompts: dict
-    ):
+    def __init__(self, invoker, model_mid: str, model_weak: str, prompts: dict):
         """
         Initialize the model testing step.
 
@@ -30,9 +27,7 @@ class ModelTestingStep:
         self.model_weak = model_weak
         self.prompts = prompts
 
-    def execute_step4_sonnet(
-        self, question: dict
-    ) -> tuple[bool, str, PipelineStep, Optional[StepRewardsReport]]:
+    def execute_step4_sonnet(self, question: dict) -> tuple[bool, str, PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 4: Test Sonnet (mid-tier) implementation response.
 
@@ -75,9 +70,7 @@ class ModelTestingStep:
 
         return True, response, step, reward_report
 
-    def execute_step5_haiku(
-        self, question: dict
-    ) -> tuple[bool, str, PipelineStep, Optional[StepRewardsReport]]:
+    def execute_step5_haiku(self, question: dict) -> tuple[bool, str, PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 5: Test Haiku (weak-tier) implementation response.
 

@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport
 from legacy_pipeline.models import PipelineStep, SevenStepResult
@@ -32,19 +32,15 @@ class PipelineLogger:
 
         # Set up log and results paths
         log_dir = os.path.join(script_dir, "logs", "current")
-        self.log_file = os.path.join(
-            log_dir, f"pipeline_run_{run_timestamp}.txt"
-        )
-        self.results_file = os.path.join(
-            script_dir, f"corrected_7step_results_{run_timestamp}.json"
-        )
+        self.log_file = os.path.join(log_dir, f"pipeline_run_{run_timestamp}.txt")
+        self.results_file = os.path.join(script_dir, f"corrected_7step_results_{run_timestamp}.json")
 
         # Ensure directories exist
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(os.path.join(script_dir, "logs", "archived"), exist_ok=True)
         os.makedirs(os.path.join(script_dir, "results"), exist_ok=True)
 
-        self.current_topic: Optional[str] = None
+        self.current_topic: str | None = None
 
     def initialize_run(self, topic: str) -> None:
         """
@@ -92,9 +88,7 @@ class PipelineLogger:
             step.timestamp,
         )
 
-    def log_step_reward(
-        self, step_number: int, report: Optional[StepRewardsReport]
-    ) -> None:
+    def log_step_reward(self, step_number: int, report: StepRewardsReport | None) -> None:
         """
         Log step reward metrics to file and database.
 
@@ -115,9 +109,7 @@ class PipelineLogger:
         ]
 
         # Save to metrics JSON file
-        metrics_path = os.path.join(
-            self.script_dir, "results", f"metrics_{self.run_timestamp}.json"
-        )
+        metrics_path = os.path.join(self.script_dir, "results", f"metrics_{self.run_timestamp}.json")
         if os.path.exists(metrics_path):
             with open(metrics_path, encoding="utf-8") as f:
                 metrics = json.load(f)
@@ -138,7 +130,7 @@ class PipelineLogger:
     def finalize_run(
         self,
         final_result: SevenStepResult,
-        assessment: Optional[dict[str, Any]] = None,
+        assessment: dict[str, Any] | None = None,
     ) -> None:
         """
         Write final result to file and update database.
@@ -168,9 +160,7 @@ class PipelineLogger:
             "final_success": bool(final_result.final_success),
             "stopped_at_step": final_result.stopped_at_step,
             "differentiation_achieved": bool(final_result.differentiation_achieved),
-            "student_assessment_created": bool(
-                final_result.student_assessment_created
-            ),
+            "student_assessment_created": bool(final_result.student_assessment_created),
             "total_attempts": final_result.total_attempts,
             "weak_model_failures": final_result.weak_model_failures,
             "steps": steps_data,
@@ -194,9 +184,7 @@ class PipelineLogger:
             final_success=final_result.final_success,
         )
 
-    def _save_reward_to_database(
-        self, step_number: int, report: StepRewardsReport
-    ) -> None:
+    def _save_reward_to_database(self, step_number: int, report: StepRewardsReport) -> None:
         """Save reward metrics to database."""
         import sqlite3
 

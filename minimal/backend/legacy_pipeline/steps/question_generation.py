@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport, rewards_step3
 from legacy_pipeline.models import PipelineStep
@@ -43,9 +43,9 @@ class QuestionGenerationStep:
         subtopic: str,
         difficulty: str,
         error_catalog: list[dict],
-        previous_failures: Optional[list[str]] = None,
+        previous_failures: list[str] | None = None,
         use_thinking: bool = False,
-    ) -> tuple[bool, dict, PipelineStep, Optional[StepRewardsReport]]:
+    ) -> tuple[bool, dict, PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 3: Generate strategic implementation challenge.
 
@@ -60,17 +60,14 @@ class QuestionGenerationStep:
         Returns:
             Tuple of (success, question_dict, pipeline_step, rewards_report)
         """
-        logger.info(
-            f"Step 3: Generating strategic question for {topic} - {subtopic} ({difficulty})"
-        )
+        logger.info(f"Step 3: Generating strategic question for {topic} - {subtopic} ({difficulty})")
 
         template = self._get_prompt_template("step3_strategic_question")
 
         failure_feedback = ""
         if previous_failures:
-            failure_feedback = (
-                "\nVALIDATION FEEDBACK (resolve before returning a new challenge):\n"
-                + "\n".join(f"- {failure}" for failure in previous_failures)
+            failure_feedback = "\nVALIDATION FEEDBACK (resolve before returning a new challenge):\n" + "\n".join(
+                f"- {failure}" for failure in previous_failures
             )
 
         catalog_names: list[str] = []
@@ -83,9 +80,7 @@ class QuestionGenerationStep:
             topic=topic,
             subtopic=subtopic,
             difficulty=difficulty,
-            catalog_names="\n".join(catalog_names)
-            if catalog_names
-            else "- (no catalog names available)",
+            catalog_names="\n".join(catalog_names) if catalog_names else "- (no catalog names available)",
             failure_feedback=failure_feedback,
         )
 
@@ -114,8 +109,7 @@ class QuestionGenerationStep:
                 requirements = candidate.get("requirements")
                 artifact_type = candidate.get("artifact_type")
                 required_fields_present = all(
-                    isinstance(candidate.get(field), str)
-                    and bool(str(candidate.get(field)).strip())
+                    isinstance(candidate.get(field), str) and bool(str(candidate.get(field)).strip())
                     for field in (
                         "title",
                         "question_text",
@@ -123,9 +117,7 @@ class QuestionGenerationStep:
                         "success_criteria",
                     )
                 )
-                valid_req_count = isinstance(requirements, list) and 4 <= len(
-                    requirements
-                ) <= 6
+                valid_req_count = isinstance(requirements, list) and 4 <= len(requirements) <= 6
                 valid_artifact = isinstance(artifact_type, str) and artifact_type in {
                     "code",
                     "prose",

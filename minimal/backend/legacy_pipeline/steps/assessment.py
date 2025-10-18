@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport, rewards_step7
 from legacy_pipeline.config import PipelineConfig
@@ -23,7 +23,7 @@ class AssessmentStep:
         prompts: dict,
         tools: dict,
         judge_supports_thinking: bool = False,
-        config: Optional[PipelineConfig] = None,
+        config: PipelineConfig | None = None,
     ):
         """
         Initialize the assessment creation step.
@@ -50,7 +50,7 @@ class AssessmentStep:
         sonnet_response: str,
         haiku_response: str,
         haiku_failures: list[str],
-    ) -> tuple[bool, dict, PipelineStep, Optional[StepRewardsReport]]:
+    ) -> tuple[bool, dict, PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 7: Create student assessment with error spans.
 
@@ -68,8 +68,8 @@ class AssessmentStep:
         topic = question.get("context", "AI/ML implementation")
         subtopic = question.get("title", "Implementation Challenge")
 
-        validation_feedback: Optional[list[str]] = None
-        last_step: Optional[PipelineStep] = None
+        validation_feedback: list[str] | None = None
+        last_step: PipelineStep | None = None
 
         for attempt in range(1, self.config.STEP7_MAX_ATTEMPTS + 1):
             prompt, tools = self._build_step7_prompt(
@@ -93,9 +93,7 @@ class AssessmentStep:
                 f"Create student assessment from weak model failures (attempt {attempt})",
                 self.model_strong,
                 False,
-                json.dumps(response)
-                if isinstance(response, (dict, list, str))
-                else str(response),
+                json.dumps(response) if isinstance(response, (dict, list, str)) else str(response),
                 datetime.now().isoformat(),
             )
 
@@ -105,18 +103,14 @@ class AssessmentStep:
                 validation_feedback.append(
                     "The model did not return valid structured output via the student_assessment_tool."
                 )
-                step.response = json.dumps(
-                    {"model_response": response, "validation_errors": validation_feedback}
-                )
+                step.response = json.dumps({"model_response": response, "validation_errors": validation_feedback})
                 payload = response if isinstance(response, dict) else {}
                 reward_report = rewards_step7(payload)
                 last_step = step
                 continue
 
             # Validate the response
-            is_valid, sanitized_payload, validation_errors = (
-                self.validator.validate_assessment(response)
-            )
+            is_valid, sanitized_payload, validation_errors = self.validator.validate_assessment(response)
 
             if is_valid:
                 step.success = True
@@ -126,9 +120,7 @@ class AssessmentStep:
 
             # Failed validation - prepare feedback for retry
             validation_feedback = validation_errors
-            step.response = json.dumps(
-                {"model_response": response, "validation_errors": validation_errors}
-            )
+            step.response = json.dumps({"model_response": response, "validation_errors": validation_errors})
             reward_report = rewards_step7(response)
             last_step = step
 
@@ -139,15 +131,10 @@ class AssessmentStep:
                 "Create student assessment from weak model failures",
                 self.model_strong,
                 False,
-                json.dumps(
-                    {
-                        "validation_errors": validation_feedback
-                        or ["Unknown Step 7 failure."]
-                    }
-                ),
+                json.dumps({"validation_errors": validation_feedback or ["Unknown Step 7 failure."]}),
                 datetime.now().isoformat(),
             )
-        
+
         reward_report = rewards_step7({})
         return False, {}, last_step, reward_report
 
@@ -158,7 +145,7 @@ class AssessmentStep:
         haiku_failures: list[str],
         haiku_response: str,
         sonnet_response: str,
-        validation_feedback: Optional[list[str]] = None,
+        validation_feedback: list[str] | None = None,
     ) -> tuple[str, list[dict[str, Any]]]:
         """
         Compose the Step 7 prompt (optionally injecting feedback from validation failures).
@@ -202,12 +189,7 @@ class AssessmentStep:
 
         tools = self._get_tools("step7_student_assessment")
         if tools:
-            difficulty_schema = (
-                tools[0]
-                .get("input_schema", {})
-                .get("properties", {})
-                .get("difficulty")
-            )
+            difficulty_schema = tools[0].get("input_schema", {}).get("properties", {}).get("difficulty")
             if isinstance(difficulty_schema, dict):
                 difficulty_schema["enum"] = sorted(self.config.ALLOWED_DIFFICULTIES)
 

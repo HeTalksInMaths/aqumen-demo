@@ -5,13 +5,13 @@ import logging
 import os
 import random
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from clients.provider import get_model_provider
 from config.prompts_loader import load_prompts
 from config.tools_loader import load_tools
 from legacy_pipeline.config import PipelineConfig
-from legacy_pipeline.models import PipelineStep, SevenStepResult
+from legacy_pipeline.models import SevenStepResult
 from legacy_pipeline.persistence.pipeline_logger import PipelineLogger
 from legacy_pipeline.steps import (
     AssessmentStep,
@@ -55,21 +55,15 @@ class LegacyPipelineOrchestrator:
             # For Anthropic, check if judge supports thinking
             if provider == "anthropic":
                 self.roles = load_model_roles()
-                self.judge_supports_thinking = self.roles[
-                    "judge"
-                ].supports_thinking
+                self.judge_supports_thinking = self.roles["judge"].supports_thinking
             else:
                 # OpenAI thinking support TBD
                 self.judge_supports_thinking = False
 
             logger.info(f"Pipeline initialized with provider: {provider}")
-            logger.info(
-                f"Models - Strong: {self.model_strong}, Mid: {self.model_mid}, Weak: {self.model_weak}"
-            )
+            logger.info(f"Models - Strong: {self.model_strong}, Mid: {self.model_mid}, Weak: {self.model_weak}")
         except Exception as e:
-            logger.error(
-                f"Failed to initialize pipeline with provider '{provider}': {e}"
-            )
+            logger.error(f"Failed to initialize pipeline with provider '{provider}': {e}")
             raise
 
         # Maintain backward compatibility for Bedrock-specific attributes
@@ -91,9 +85,7 @@ class LegacyPipelineOrchestrator:
         self.db_path = os.path.join(self.script_dir, "pipeline_results.db")
 
         # Initialize logger
-        self.logger = PipelineLogger(
-            self.script_dir, self.run_timestamp, self.db_path
-        )
+        self.logger = PipelineLogger(self.script_dir, self.run_timestamp, self.db_path)
 
         # Load prompts and tools
         try:
@@ -108,13 +100,9 @@ class LegacyPipelineOrchestrator:
 
     def _init_step_executors(self) -> None:
         """Initialize all step executor modules."""
-        self.step1 = DifficultyStep(
-            self.invoker, self.model_mid, self.prompts, self.tools
-        )
+        self.step1 = DifficultyStep(self.invoker, self.model_mid, self.prompts, self.tools)
 
-        self.step2 = ErrorCatalogStep(
-            self.invoker, self.model_mid, self.prompts, self.tools
-        )
+        self.step2 = ErrorCatalogStep(self.invoker, self.model_mid, self.prompts, self.tools)
 
         self.step3 = QuestionGenerationStep(
             self.invoker,
@@ -124,13 +112,9 @@ class LegacyPipelineOrchestrator:
             self.judge_supports_thinking,
         )
 
-        self.step4_5 = ModelTestingStep(
-            self.invoker, self.model_mid, self.model_weak, self.prompts
-        )
+        self.step4_5 = ModelTestingStep(self.invoker, self.model_mid, self.model_weak, self.prompts)
 
-        self.step6 = JudgmentStep(
-            self.invoker, self.model_strong, self.prompts, self.tools
-        )
+        self.step6 = JudgmentStep(self.invoker, self.model_strong, self.prompts, self.tools)
 
         self.step7 = AssessmentStep(
             self.invoker,
@@ -141,9 +125,7 @@ class LegacyPipelineOrchestrator:
             self.config,
         )
 
-    def run_full_pipeline(
-        self, topic: str, max_attempts: int = 3
-    ) -> SevenStepResult:
+    def run_full_pipeline(self, topic: str, max_attempts: int = 3) -> SevenStepResult:
         """
         Run the complete corrected 7-step pipeline.
 
@@ -168,40 +150,30 @@ class LegacyPipelineOrchestrator:
         self.logger.log_step_reward(1, reward1)
 
         if not success:
-            result = SevenStepResult(
-                topic, "", "", steps_completed, False, 1, False, False, 1, []
-            )
+            result = SevenStepResult(topic, "", "", steps_completed, False, 1, False, False, 1, [])
             self.logger.finalize_run(result)
             return result
 
         # Randomly select difficulty level and subtopic for testing
         available_difficulties = [
-            d
-            for d in ["Beginner", "Intermediate", "Advanced"]
-            if d in categories and categories[d]
+            d for d in ["Beginner", "Intermediate", "Advanced"] if d in categories and categories[d]
         ]
         if available_difficulties:
             difficulty = random.choice(available_difficulties)
             subtopics = categories.get(difficulty, ["General concepts"])
-            subtopic = (
-                random.choice(subtopics) if subtopics else "General concepts"
-            )
+            subtopic = random.choice(subtopics) if subtopics else "General concepts"
         else:
             difficulty = "Intermediate"
             subtopic = "General concepts"
 
         # Step 2: Generate error catalog (run once)
-        success, error_catalog, step2, reward2 = self.step2.execute(
-            topic, subtopic, difficulty
-        )
+        success, error_catalog, step2, reward2 = self.step2.execute(topic, subtopic, difficulty)
         steps_completed.append(step2)
         self.logger.log_step(step2)
         self.logger.log_step_reward(2, reward2)
 
         if not success:
-            result = SevenStepResult(
-                topic, subtopic, difficulty, steps_completed, False, 2, False, False, 1, []
-            )
+            result = SevenStepResult(topic, subtopic, difficulty, steps_completed, False, 2, False, False, 1, [])
             self.logger.finalize_run(result)
             return result
 
@@ -260,9 +232,7 @@ class LegacyPipelineOrchestrator:
                 haiku_failures,
                 step6,
                 reward6,
-            ) = self.step6.execute(
-                question, sonnet_response, haiku_response, error_catalog
-            )
+            ) = self.step6.execute(question, sonnet_response, haiku_response, error_catalog)
             attempt_steps.append(step6)
             self.logger.log_step(step6)
             self.logger.log_step_reward(6, reward6)
@@ -274,9 +244,7 @@ class LegacyPipelineOrchestrator:
             judge_reasoning_lower = judge_reasoning_text.lower()
 
             if differentiation_achieved:
-                logger.info(
-                    f"✅ Differentiation achieved on attempt {attempt}"
-                )
+                logger.info(f"✅ Differentiation achieved on attempt {attempt}")
 
                 # Step 7: Create student assessment based on actual weak model failures
                 success, assessment, step7, reward7 = self.step7.execute(
@@ -301,9 +269,7 @@ class LegacyPipelineOrchestrator:
                 self.logger.finalize_run(result, assessment if success else None)
                 return result
             else:
-                logger.info(
-                    f"❌ Attempt {attempt} failed differentiation - Step 6 blocked progression"
-                )
+                logger.info(f"❌ Attempt {attempt} failed differentiation - Step 6 blocked progression")
 
                 # Build detailed failure context for next attempt
                 failure_text = self._build_failure_feedback(
@@ -360,42 +326,32 @@ class LegacyPipelineOrchestrator:
         yield step1  # ← Yield immediately!
 
         if not success:
-            result = SevenStepResult(
-                topic, "", "", steps_completed, False, 1, False, False, 1, []
-            )
+            result = SevenStepResult(topic, "", "", steps_completed, False, 1, False, False, 1, [])
             self.logger.finalize_run(result)
             yield {"final_result": result}
             return
 
         # Randomly select difficulty level and subtopic
         available_difficulties = [
-            d
-            for d in ["Beginner", "Intermediate", "Advanced"]
-            if d in categories and categories[d]
+            d for d in ["Beginner", "Intermediate", "Advanced"] if d in categories and categories[d]
         ]
         if available_difficulties:
             difficulty = random.choice(available_difficulties)
             subtopics = categories.get(difficulty, ["General concepts"])
-            subtopic = (
-                random.choice(subtopics) if subtopics else "General concepts"
-            )
+            subtopic = random.choice(subtopics) if subtopics else "General concepts"
         else:
             difficulty = "Intermediate"
             subtopic = "General concepts"
 
         # Step 2: Generate error catalog
-        success, error_catalog, step2, reward2 = self.step2.execute(
-            topic, subtopic, difficulty
-        )
+        success, error_catalog, step2, reward2 = self.step2.execute(topic, subtopic, difficulty)
         steps_completed.append(step2)
         self.logger.log_step(step2)
         self.logger.log_step_reward(2, reward2)
         yield step2  # ← Yield immediately!
 
         if not success:
-            result = SevenStepResult(
-                topic, subtopic, difficulty, steps_completed, False, 2, False, False, 1, []
-            )
+            result = SevenStepResult(topic, subtopic, difficulty, steps_completed, False, 2, False, False, 1, [])
             self.logger.finalize_run(result)
             yield {"final_result": result}
             return
@@ -458,9 +414,7 @@ class LegacyPipelineOrchestrator:
                 haiku_failures,
                 step6,
                 reward6,
-            ) = self.step6.execute(
-                question, sonnet_response, haiku_response, error_catalog
-            )
+            ) = self.step6.execute(question, sonnet_response, haiku_response, error_catalog)
             attempt_steps.append(step6)
             self.logger.log_step(step6)
             self.logger.log_step_reward(6, reward6)
@@ -473,9 +427,7 @@ class LegacyPipelineOrchestrator:
             judge_reasoning_lower = judge_reasoning_text.lower()
 
             if differentiation_achieved:
-                logger.info(
-                    f"✅ Differentiation achieved on attempt {attempt}"
-                )
+                logger.info(f"✅ Differentiation achieved on attempt {attempt}")
 
                 # Step 7: Create student assessment
                 success, assessment, step7, reward7 = self.step7.execute(
@@ -499,9 +451,7 @@ class LegacyPipelineOrchestrator:
                     total_attempts=attempt,
                     weak_model_failures=haiku_failures,
                 )
-                self.logger.finalize_run(
-                    final_result, assessment if success else None
-                )
+                self.logger.finalize_run(final_result, assessment if success else None)
                 yield {"final_result": final_result, "assessment": assessment}
                 return
             else:
@@ -569,10 +519,7 @@ class LegacyPipelineOrchestrator:
                 f"Judge said: {judge_reasoning_text[:200]}"
             )
         else:
-            return (
-                f"Attempt {attempt}: Insufficient differentiation. "
-                f"Judge: {judge_reasoning_text[:300]}"
-            )
+            return f"Attempt {attempt}: Insufficient differentiation. Judge: {judge_reasoning_text[:300]}"
 
     def run_batch_test(self, topics: list[str]) -> list[SevenStepResult]:
         """
@@ -587,26 +534,20 @@ class LegacyPipelineOrchestrator:
         results = []
 
         for i, topic in enumerate(topics, 1):
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"CORRECTED PIPELINE - TOPIC {i}/{len(topics)}: {topic}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             result = self.run_full_pipeline(topic)
             results.append(result)
 
             # Print immediate result
             if result.differentiation_achieved:
-                print(
-                    f"✅ SUCCESS: Achieved differentiation in {result.total_attempts} attempts"
-                )
+                print(f"✅ SUCCESS: Achieved differentiation in {result.total_attempts} attempts")
                 if result.weak_model_failures:
-                    print(
-                        f"   Weak model failures: {', '.join(result.weak_model_failures)}"
-                    )
+                    print(f"   Weak model failures: {', '.join(result.weak_model_failures)}")
             else:
-                print(
-                    f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts"
-                )
+                print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
 
         return results
 
@@ -629,12 +570,8 @@ class LegacyPipelineOrchestrator:
                 # Normalize failure text for counting
                 normalized = failure.lower().strip()
                 if normalized:
-                    failure_counts[normalized] = (
-                        failure_counts.get(normalized, 0) + 1
-                    )
+                    failure_counts[normalized] = failure_counts.get(normalized, 0) + 1
 
         # Return top 5 most common failures
-        sorted_failures = sorted(
-            failure_counts.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_failures = sorted(failure_counts.items(), key=lambda x: x[1], reverse=True)
         return dict(sorted_failures[:5])

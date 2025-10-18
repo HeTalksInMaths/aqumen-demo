@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from analytics.rewards import StepRewardsReport, rewards_step1
 from legacy_pipeline.models import PipelineStep
@@ -28,9 +28,7 @@ class DifficultyStep:
         self.prompts = prompts
         self.tools = tools
 
-    def execute(
-        self, topic: str
-    ) -> tuple[bool, dict[str, list[str]], PipelineStep, Optional[StepRewardsReport]]:
+    def execute(self, topic: str) -> tuple[bool, dict[str, list[str]], PipelineStep, StepRewardsReport | None]:
         """
         Execute Step 1: Generate difficulty categories.
 
@@ -63,8 +61,7 @@ class DifficultyStep:
                 required_keys = {"Beginner", "Intermediate", "Advanced"}
                 key_set = set(candidate.keys())
                 counts_valid = all(
-                    isinstance(candidate.get(key), list)
-                    and 3 <= len(candidate.get(key, [])) <= 5
+                    isinstance(candidate.get(key), list) and 3 <= len(candidate.get(key, [])) <= 5
                     for key in required_keys
                 )
                 if key_set == required_keys and counts_valid:

@@ -22,9 +22,7 @@ class AssessmentValidator:
         """
         self.config = config
 
-    def validate_assessment(
-        self, payload: dict[str, Any]
-    ) -> tuple[bool, dict[str, Any], list[str]]:
+    def validate_assessment(self, payload: dict[str, Any]) -> tuple[bool, dict[str, Any], list[str]]:
         """
         Run deterministic checks to ensure Step 7 output matches frontend expectations.
 
@@ -48,13 +46,8 @@ class AssessmentValidator:
 
         # Validate difficulty
         difficulty = payload.get("difficulty")
-        if (
-            not isinstance(difficulty, str)
-            or difficulty not in self.config.ALLOWED_DIFFICULTIES
-        ):
-            errors.append(
-                f"Difficulty must be one of {sorted(self.config.ALLOWED_DIFFICULTIES)}."
-            )
+        if not isinstance(difficulty, str) or difficulty not in self.config.ALLOWED_DIFFICULTIES:
+            errors.append(f"Difficulty must be one of {sorted(self.config.ALLOWED_DIFFICULTIES)}.")
 
         # Validate content_type
         content_type = payload.get("content_type")
@@ -62,15 +55,11 @@ class AssessmentValidator:
             if isinstance(payload.get("code"), list):
                 content_type = "code"
             else:
-                errors.append(
-                    "content_type must be provided and be one of the supported modalities."
-                )
+                errors.append("content_type must be provided and be one of the supported modalities.")
                 content_type = "code"
         content_type = content_type.strip().lower()
         if content_type not in self.config.ALLOWED_CONTENT_TYPES:
-            errors.append(
-                f"content_type must be one of {sorted(self.config.ALLOWED_CONTENT_TYPES)}."
-            )
+            errors.append(f"content_type must be one of {sorted(self.config.ALLOWED_CONTENT_TYPES)}.")
 
         # Validate content/code array
         content_lines = payload.get("content")
@@ -80,9 +69,7 @@ class AssessmentValidator:
         if isinstance(content_lines, str):
             try:
                 parsed = json.loads(content_lines)
-                if isinstance(parsed, list) and all(
-                    isinstance(line, str) for line in parsed
-                ):
+                if isinstance(parsed, list) and all(isinstance(line, str) for line in parsed):
                     content_lines = parsed
                     logger.warning(
                         f"Step 7 auto-fix: Converted stringified array to native JSON array ({len(parsed)} lines)"
@@ -94,18 +81,12 @@ class AssessmentValidator:
                 # content_lines is a string, split it
                 content_lines = str(content_lines).splitlines()
 
-        if not isinstance(content_lines, list) or not all(
-            isinstance(line, str) for line in content_lines
-        ):
+        if not isinstance(content_lines, list) or not all(isinstance(line, str) for line in content_lines):
             errors.append("content must be an array of strings.")
             content_lines = []
         else:
             content_lines = [line.rstrip("\r\n") for line in content_lines]
-            if not (
-                self.config.MIN_CODE_LINES
-                <= len(content_lines)
-                <= self.config.MAX_CODE_LINES
-            ):
+            if not (self.config.MIN_CODE_LINES <= len(content_lines) <= self.config.MAX_CODE_LINES):
                 errors.append(
                     f"content must contain between {self.config.MIN_CODE_LINES} and "
                     f"{self.config.MAX_CODE_LINES} lines (found {len(content_lines)})."
@@ -113,15 +94,11 @@ class AssessmentValidator:
 
         # Validate errors array
         errors_list = payload.get("errors")
-        if not isinstance(errors_list, list) or not all(
-            isinstance(item, dict) for item in (errors_list or [])
-        ):
+        if not isinstance(errors_list, list) or not all(isinstance(item, dict) for item in (errors_list or [])):
             errors.append("Errors must be an array of objects.")
             errors_list = []
 
-        if errors_list and not (
-            self.config.MIN_ERRORS <= len(errors_list) <= self.config.MAX_ERRORS
-        ):
+        if errors_list and not (self.config.MIN_ERRORS <= len(errors_list) <= self.config.MAX_ERRORS):
             errors.append(
                 f"Errors array must contain between {self.config.MIN_ERRORS} and "
                 f"{self.config.MAX_ERRORS} entries (found {len(errors_list)})."
@@ -156,11 +133,7 @@ class AssessmentValidator:
             else:
                 seen_ids.add(error_id)
 
-            if not (
-                self.config.MIN_ERROR_SPAN
-                <= len(error_id)
-                <= self.config.MAX_ERROR_SPAN
-            ):
+            if not (self.config.MIN_ERROR_SPAN <= len(error_id) <= self.config.MAX_ERROR_SPAN):
                 errors.append(
                     f"Error id '{error_id}' must be between {self.config.MIN_ERROR_SPAN} and "
                     f"{self.config.MAX_ERROR_SPAN} characters (found {len(error_id)})."
@@ -168,23 +141,17 @@ class AssessmentValidator:
 
             occurrences = joined_content.count(f"<<{error_id}>>")
             if occurrences != 1:
-                errors.append(
-                    f"Error id '{error_id}' must appear exactly once in the content; found {occurrences}."
-                )
+                errors.append(f"Error id '{error_id}' must appear exactly once in the content; found {occurrences}.")
 
             if error_id not in marked_spans:
-                errors.append(
-                    f"Error id '{error_id}' is not wrapped in << >> within the content."
-                )
+                errors.append(f"Error id '{error_id}' is not wrapped in << >> within the content.")
 
             if not isinstance(description, str) or not description.strip():
                 errors.append(f"Error id '{error_id}' is missing a description.")
             else:
                 desc = description.strip()
                 if len(desc) > 180:
-                    errors.append(
-                        f"Error description for id '{error_id}' is too long ({len(desc)} chars, max 180)."
-                    )
+                    errors.append(f"Error description for id '{error_id}' is too long ({len(desc)} chars, max 180).")
                 description = desc
 
             sanitized_errors.append({"id": error_id, "description": description})
