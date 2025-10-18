@@ -1,13 +1,13 @@
 import json
-import time
-import random
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import random
+import time
 from dataclasses import dataclass
+from typing import Any
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ClientError, BotoCoreError
+from botocore.exceptions import BotoCoreError, ClientError
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +38,9 @@ class BedrockRuntime:
 
     def __init__(self, region: str = "us-west-2"):
         self.region = region
-        self._client: Optional[Any] = None
-        self._import_error: Optional[Exception] = None
-        self.usage_log: List[UsageMetrics] = []
+        self._client: Any | None = None
+        self._import_error: Exception | None = None
+        self.usage_log: list[UsageMetrics] = []
         try:
             retry_config = Config(
                 retries={
@@ -63,7 +63,7 @@ class BedrockRuntime:
             )
         return self._client
 
-    def _calculate_cost(self, model_id: str, usage: Dict[str, int]) -> float:
+    def _calculate_cost(self, model_id: str, usage: dict[str, int]) -> float:
         """Calculate cost based on token usage and model pricing"""
         pricing = self.PRICING.get(model_id, {"input": 0.0, "output": 0.0, "cache_creation": 0.0, "cache_read": 0.0})
 
@@ -74,7 +74,7 @@ class BedrockRuntime:
 
         return input_cost + output_cost + cache_creation_cost + cache_read_cost
 
-    def _log_usage_from_data(self, model_id: str, response_data: Dict[str, Any], start_time: float) -> UsageMetrics:
+    def _log_usage_from_data(self, model_id: str, response_data: dict[str, Any], start_time: float) -> UsageMetrics:
         """Extract usage information from parsed response data and calculate cost"""
         usage_data = response_data.get('usage', {})
 
@@ -97,10 +97,10 @@ class BedrockRuntime:
     def _invoke_with_retry(
         self,
         model_id: str,
-        body: Dict[str, Any],
+        body: dict[str, Any],
         max_retries: int = 5,
         base_delay: float = 40.0
-    ) -> Tuple[Dict[str, Any], UsageMetrics]:
+    ) -> tuple[dict[str, Any], UsageMetrics]:
         """
         Invoke model with exponential backoff retry logic.
 
@@ -174,7 +174,7 @@ class BedrockRuntime:
         """Get total cost across all API calls"""
         return sum(m.total_cost_usd for m in self.usage_log)
 
-    def get_usage_summary(self) -> Dict[str, Any]:
+    def get_usage_summary(self) -> dict[str, Any]:
         """Get summary of usage metrics"""
         if not self.usage_log:
             return {"total_calls": 0, "total_cost_usd": 0.0}
@@ -225,12 +225,12 @@ class BedrockRuntime:
         self,
         model_id: str,
         prompt: str,
-        tools: List[Dict[str, Any]],
+        tools: list[dict[str, Any]],
         max_tokens: int = 2048,
         use_thinking: bool = False,
         thinking_budget: int = 2048,
         temperature: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Invoke model with tools, retry logic and cost tracking"""
         temp_value = temperature
         if use_thinking:

@@ -1,6 +1,7 @@
 import json
 import time
-from typing import Dict, Any, List
+from typing import Any
+
 
 class BedrockRuntime:
     def __init__(self, region: str = "us-west-2"):
@@ -36,8 +37,8 @@ class BedrockRuntime:
         data = json.loads(resp["body"].read())
         return (data.get("content",[{}])[0].get("text")) or "Error: No content generated."
 
-    def invoke_with_tools(self, model_id: str, prompt: str, tools: List[Dict[str, Any]],
-                          max_tokens: int = 2048, use_thinking: bool=False, thinking_budget: int=2048) -> Dict[str, Any]:
+    def invoke_with_tools(self, model_id: str, prompt: str, tools: list[dict[str, Any]],
+                          max_tokens: int = 2048, use_thinking: bool=False, thinking_budget: int=2048) -> dict[str, Any]:
         self._ensure()
         time.sleep(1)
         body = {

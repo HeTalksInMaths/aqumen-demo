@@ -7,14 +7,14 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROMPTS_FILE = BASE_DIR / "prompts.json"
 PROMPTS_CHANGES_FILE = BASE_DIR / "prompts_changes.json"
 
 
-def _load_json(path: Path, *, allow_missing: bool = False) -> Dict[str, Any]:
+def _load_json(path: Path, *, allow_missing: bool = False) -> dict[str, Any]:
     """
     Load a JSON file from disk.
 
@@ -36,16 +36,16 @@ def _load_json(path: Path, *, allow_missing: bool = False) -> Dict[str, Any]:
 
 
 def merge_prompt_changes(
-    base_prompts: Dict[str, Dict[str, Any]],
-    overrides: Dict[str, Dict[str, Any]]
-) -> Dict[str, Dict[str, Any]]:
+    base_prompts: dict[str, dict[str, Any]],
+    overrides: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
     """
     Merge UI overrides into the base prompt configuration.
 
     Overrides replace the matching keys from the base definition while keeping any
     untouched metadata so downstream callers always see a complete prompt entry.
     """
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: dict[str, dict[str, Any]] = {}
 
     for key, value in base_prompts.items():
         merged[key] = deepcopy(value) if isinstance(value, dict) else value
@@ -74,7 +74,7 @@ def load_prompts(
     *,
     prompts_path: Path | None = None,
     overrides_path: Path | None = None
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """
     Load prompt templates, applying any overrides saved by the Dev Mode UI.
     """

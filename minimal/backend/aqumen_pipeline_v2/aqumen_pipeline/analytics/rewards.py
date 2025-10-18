@@ -1,7 +1,9 @@
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
+
 from ..validators.assessment import validate_assessment_payload
+
 
 @dataclass
 class RewardResult:
@@ -12,12 +14,12 @@ class RewardResult:
 @dataclass
 class StepRewardsReport:
     step: int
-    results: List[RewardResult]
+    results: list[RewardResult]
     @property
     def pass_rate(self) -> float:
         return (sum(1 for r in self.results if r.passed) / max(1, len(self.results)))
 
-def rewards_step1(categories: Dict[str, List[str]]) -> StepRewardsReport:
+def rewards_step1(categories: dict[str, list[str]]) -> StepRewardsReport:
     res = []
     res.append(RewardResult("keys_exact", set(categories.keys()) == {"Beginner","Intermediate","Advanced"}))
     res.append(RewardResult("count_range", all(3 <= len(categories[k]) <= 5 for k in categories)))
@@ -29,7 +31,7 @@ def rewards_step1(categories: Dict[str, List[str]]) -> StepRewardsReport:
     res.append(RewardResult("subtopics_concrete", concrete))
     return StepRewardsReport(step=1, results=res)
 
-def rewards_step2(catalog: Dict[str, Any]) -> StepRewardsReport:
+def rewards_step2(catalog: dict[str, Any]) -> StepRewardsReport:
     errs = catalog.get("errors", [])
     res = []
     res.append(RewardResult("count_exact_6", len(errs) == 6, f"found={len(errs)}"))
@@ -43,7 +45,7 @@ def rewards_step2(catalog: Dict[str, Any]) -> StepRewardsReport:
     res.append(RewardResult("match_hint_present", all(len(e.get("match_hint"," ").strip()) >= 6 and e.get("match_hint"," ").strip().lower() not in GENERIC for e in errs)))
     return StepRewardsReport(step=2, results=res)
 
-def rewards_step3(question: Dict[str, Any], known_mistake_names: List[str]) -> StepRewardsReport:
+def rewards_step3(question: dict[str, Any], known_mistake_names: list[str]) -> StepRewardsReport:
     res = []
     reqd = {"title","question_text","context","artifact_type","requirements","success_criteria"}
     res.append(RewardResult("fields_present", reqd <= set(question.keys())))
@@ -56,7 +58,7 @@ def rewards_step3(question: Dict[str, Any], known_mistake_names: List[str]) -> S
     res.append(RewardResult("targets_subset_catalog", set(question.get("target_error_patterns", [])) <= set(known_mistake_names)))
     return StepRewardsReport(step=3, results=res)
 
-def rewards_step45(output_text: str, requirements: List[str]) -> StepRewardsReport:
+def rewards_step45(output_text: str, requirements: list[str]) -> StepRewardsReport:
     res = []
     res.append(RewardResult("sections_present", all(h in output_text for h in ("### OUTPUT","### RATIONALE","### CONSIDERATIONS"))))
     lines = [line for line in output_text.splitlines() if line.strip()]
@@ -66,7 +68,7 @@ def rewards_step45(output_text: str, requirements: List[str]) -> StepRewardsRepo
     res.append(RewardResult("coverage_soft>=0.5", coverage_ratio >= 0.5, f"coverage={coverage_ratio:.2f}"))
     return StepRewardsReport(step=45, results=res)
 
-def rewards_step6(judge_obj: Dict[str, Any], known_mistake_names: List[str], weak_text: str) -> StepRewardsReport:
+def rewards_step6(judge_obj: dict[str, Any], known_mistake_names: list[str], weak_text: str) -> StepRewardsReport:
     res = []
     req = {"differentiation_achieved","failures_weaker","reasoning"}
     res.append(RewardResult("schema_core", req <= set(judge_obj.keys())))
@@ -78,7 +80,7 @@ def rewards_step6(judge_obj: Dict[str, Any], known_mistake_names: List[str], wea
     res.append(RewardResult("evidence_in_weak_text", all((isinstance(e, str) and (e.lower() in weak_text.lower())) for e in ev) if ev else True))
     return StepRewardsReport(step=6, results=res)
 
-def rewards_step7(assessment_obj: Dict[str, Any]) -> StepRewardsReport:
+def rewards_step7(assessment_obj: dict[str, Any]) -> StepRewardsReport:
     res = []
     ok, _, issues = validate_assessment_payload(assessment_obj)
     res.append(RewardResult("validator_ok", ok, "; ".join(issues[:3])))

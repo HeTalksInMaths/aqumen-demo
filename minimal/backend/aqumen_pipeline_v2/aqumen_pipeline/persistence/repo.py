@@ -1,6 +1,7 @@
 import json
 import sqlite3
-from typing import Dict, Any, List
+from typing import Any
+
 
 class Repo:
     def __init__(self, db_path: str):
@@ -64,7 +65,7 @@ class Repo:
         conn.commit()
         conn.close()
 
-    def save_rewards(self, run_ts: str, step: int, pass_rate: float, details: List[Dict[str, Any]]):
+    def save_rewards(self, run_ts: str, step: int, pass_rate: float, details: list[dict[str, Any]]):
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.execute("""

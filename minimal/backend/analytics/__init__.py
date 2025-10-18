@@ -6,9 +6,9 @@ from .rewards import (  # noqa: F401
     rewards_step1,
     rewards_step2,
     rewards_step3,
-    rewards_step45,
     rewards_step6,
     rewards_step7,
+    rewards_step45,
 )
 
 __all__ = [

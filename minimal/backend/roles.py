@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -10,7 +9,7 @@ class ModelRole:
     supports_thinking: bool = False
 
 
-def load_model_roles() -> Dict[str, ModelRole]:
+def load_model_roles() -> dict[str, ModelRole]:
     return {
         "judge": ModelRole(
             id=os.getenv("AQU_MODEL_JUDGE_ID", "us.anthropic.claude-opus-4-1-20250805-v1:0"),

@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -13,7 +13,7 @@ class RewardResult:
 @dataclass
 class StepRewardsReport:
     step: int
-    results: List[RewardResult]
+    results: list[RewardResult]
 
     @property
     def pass_rate(self) -> float:
@@ -22,10 +22,10 @@ class StepRewardsReport:
         return sum(1 for r in self.results if r.passed) / len(self.results)
 
 
-def rewards_step1(categories: Dict[str, List[str]]) -> StepRewardsReport:
+def rewards_step1(categories: dict[str, list[str]]) -> StepRewardsReport:
     categories = categories or {}
     required_keys = {"Beginner", "Intermediate", "Advanced"}
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
 
     key_set = set(categories.keys())
     results.append(RewardResult("keys_exact", key_set == required_keys, f"found={sorted(key_set)}"))
@@ -55,9 +55,9 @@ def rewards_step1(categories: Dict[str, List[str]]) -> StepRewardsReport:
     return StepRewardsReport(step=1, results=results)
 
 
-def rewards_step2(error_catalog: List[Dict[str, Any]]) -> StepRewardsReport:
+def rewards_step2(error_catalog: list[dict[str, Any]]) -> StepRewardsReport:
     errors = error_catalog or []
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
 
     results.append(RewardResult("count_exact_6", len(errors) == 6, f"found={len(errors)}"))
 
@@ -89,9 +89,9 @@ def rewards_step2(error_catalog: List[Dict[str, Any]]) -> StepRewardsReport:
     return StepRewardsReport(step=2, results=results)
 
 
-def rewards_step3(question: Dict[str, Any]) -> StepRewardsReport:
+def rewards_step3(question: dict[str, Any]) -> StepRewardsReport:
     question = question or {}
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
     required_fields = {"title", "question_text", "context", "artifact_type", "requirements", "success_criteria"}
     results.append(RewardResult("fields_present", required_fields <= set(question.keys())))
 
@@ -114,11 +114,11 @@ def rewards_step3(question: Dict[str, Any]) -> StepRewardsReport:
     return StepRewardsReport(step=3, results=results)
 
 
-def rewards_step45(output_text: str, requirements: List[str]) -> StepRewardsReport:
+def rewards_step45(output_text: str, requirements: list[str]) -> StepRewardsReport:
     output_text = output_text or ""
     requirements = requirements or []
 
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
     sections_present = all(section in output_text for section in ("### OUTPUT", "### RATIONALE", "### CONSIDERATIONS"))
     results.append(RewardResult("sections_present", sections_present))
 
@@ -136,12 +136,12 @@ def rewards_step45(output_text: str, requirements: List[str]) -> StepRewardsRepo
     return StepRewardsReport(step=45, results=results)
 
 
-def rewards_step6(judge_obj: Dict[str, Any], known_mistake_names: List[str], weak_text: str) -> StepRewardsReport:
+def rewards_step6(judge_obj: dict[str, Any], known_mistake_names: list[str], weak_text: str) -> StepRewardsReport:
     judge_obj = judge_obj or {}
     known_mistake_names = known_mistake_names or []
     weak_text = weak_text or ""
 
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
     required_core = {"differentiation_achieved", "failures_weaker", "reasoning"}
     results.append(RewardResult("schema_core", required_core <= set(judge_obj.keys())))
 
@@ -165,9 +165,9 @@ def rewards_step6(judge_obj: Dict[str, Any], known_mistake_names: List[str], wea
     return StepRewardsReport(step=6, results=results)
 
 
-def rewards_step7(assessment_obj: Dict[str, Any]) -> StepRewardsReport:
+def rewards_step7(assessment_obj: dict[str, Any]) -> StepRewardsReport:
     assessment_obj = assessment_obj or {}
-    results: List[RewardResult] = []
+    results: list[RewardResult] = []
 
     lines = assessment_obj.get("content")
     if not isinstance(lines, list):

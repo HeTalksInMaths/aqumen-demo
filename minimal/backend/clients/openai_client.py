@@ -1,13 +1,12 @@
-import os
 import json
-import time
-import random
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import os
+import random
+import time
 from dataclasses import dataclass
+from typing import Any
 
-from openai import OpenAI
-from openai import APIError, RateLimitError, APIConnectionError
+from openai import APIConnectionError, APIError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +36,10 @@ class OpenAIRuntime:
     }
 
     def __init__(self):
-        self.usage_log: List[UsageMetrics] = []
-        self._client: Optional[OpenAI] = None
+        self.usage_log: list[UsageMetrics] = []
+        self._client: OpenAI | None = None
         self._is_azure = False
-        self._import_error: Optional[Exception] = None
+        self._import_error: Exception | None = None
 
         try:
             # Check for Azure OpenAI configuration
@@ -81,7 +80,7 @@ class OpenAIRuntime:
             )
         return self._client
 
-    def _calculate_cost(self, model_id: str, usage: Dict[str, int]) -> float:
+    def _calculate_cost(self, model_id: str, usage: dict[str, int]) -> float:
         """Calculate cost based on token usage and model pricing"""
         # Normalize model name for pricing lookup
         model_key = model_id
@@ -132,13 +131,13 @@ class OpenAIRuntime:
     def _invoke_with_retry(
         self,
         model_id: str,
-        messages: List[Dict[str, Any]],
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
         max_tokens: int = 2048,
         temperature: float = 0.0,
         max_retries: int = 5,
         base_delay: float = 2.0
-    ) -> Tuple[Any, UsageMetrics]:
+    ) -> tuple[Any, UsageMetrics]:
         """
         Invoke model with exponential backoff retry logic.
 
@@ -183,7 +182,7 @@ class OpenAIRuntime:
 
                 return response, metrics
 
-            except RateLimitError as e:
+            except RateLimitError:
                 if attempt == max_retries:
                     logger.error(f"Max retries ({max_retries}) exceeded for RateLimitError")
                     raise
@@ -209,7 +208,7 @@ class OpenAIRuntime:
         """Get total cost across all API calls"""
         return sum(m.total_cost_usd for m in self.usage_log)
 
-    def get_usage_summary(self) -> Dict[str, Any]:
+    def get_usage_summary(self) -> dict[str, Any]:
         """Get summary of usage metrics"""
         if not self.usage_log:
             return {"total_calls": 0, "total_cost_usd": 0.0}
@@ -262,12 +261,12 @@ class OpenAIRuntime:
         self,
         model_id: str,
         prompt: str,
-        tools: List[Dict[str, Any]],
+        tools: list[dict[str, Any]],
         max_tokens: int = 2048,
         use_thinking: bool = False,
         thinking_budget: int = 2048,
         temperature: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Invoke model with tools, retry logic and cost tracking"""
         # Note: GPT-5 thinking mode may differ from Claude's implementation
         # For now, we'll use standard function calling

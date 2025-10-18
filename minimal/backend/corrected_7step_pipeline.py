@@ -7,31 +7,30 @@ Step 7: Creates student assessment based on actual weak model failures
 '''
 
 import json
+import logging
 import os
 import random
-from copy import deepcopy
-from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
-import logging
-from dataclasses import dataclass
 import re
-
-from config import load_prompts, load_tools
-from roles import load_model_roles
-from clients.bedrock import BedrockRuntime
-from clients.provider import get_model_provider, get_provider_info
-from services.invoke import Invoker
-from persistence.repo import Repo
 import sqlite3
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
 from analytics.rewards import (
     StepRewardsReport,
     rewards_step1,
     rewards_step2,
     rewards_step3,
-    rewards_step45,
     rewards_step6,
     rewards_step7,
+    rewards_step45,
 )
+from clients.provider import get_model_provider
+from config import load_prompts, load_tools
+from persistence.repo import Repo
+from roles import load_model_roles
+from services.invoke import Invoker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,13 +50,13 @@ class SevenStepResult:
     topic: str
     subtopic: str
     difficulty: str
-    steps_completed: List[PipelineStep]
+    steps_completed: list[PipelineStep]
     final_success: bool
     stopped_at_step: int
     differentiation_achieved: bool
     student_assessment_created: bool
     total_attempts: int
-    weak_model_failures: List[str]  # Track actual failure patterns
+    weak_model_failures: list[str]  # Track actual failure patterns
 
 class CorrectedSevenStepPipeline:
     def __init__(self, provider: str = "anthropic"):
@@ -103,18 +102,18 @@ class CorrectedSevenStepPipeline:
 
         # Generate timestamped file names for this pipeline run
         self.run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Create paths relative to the script's location
         log_dir = os.path.join(script_dir, "logs", "current")
         results_dir = os.path.join(script_dir, "results")
         self.log_file = os.path.join(log_dir, f"pipeline_run_{self.run_timestamp}.txt")
         self.results_file = os.path.join(script_dir, f"corrected_7step_results_{self.run_timestamp}.json")
-        
+
         # Ensure log directories exist
         os.makedirs(log_dir, exist_ok=True)
         os.makedirs(os.path.join(script_dir, "logs", "archived"), exist_ok=True)
         os.makedirs(results_dir, exist_ok=True)
-        
+
         # Initialize database connection relative to the script's location
         self.db_path = os.path.join(script_dir, "pipeline_results.db")
         self.repo = Repo(self.db_path)
@@ -144,11 +143,11 @@ class CorrectedSevenStepPipeline:
         self,
         model_id: str,
         prompt: str,
-        tools: List[Dict[str, Any]],
+        tools: list[dict[str, Any]],
         max_tokens: int = 2048,
         use_thinking: bool = False,
         thinking_budget: int = 2048,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         '''Invoke a model via the Bedrock runtime wrapper with tool support.'''
         safe_use_thinking = use_thinking and self.judge_supports_thinking
         return self.invoker.tools(
@@ -170,7 +169,7 @@ class CorrectedSevenStepPipeline:
             f.write(f"TIMESTAMP: {step.timestamp}\n")
             f.write(f"SUCCESS: {step.success}\n")
             f.write(f"RESPONSE:\n{step.response}\n")
-        
+
         # Log to database
         self.repo.save_step(
             self.run_timestamp,
@@ -187,7 +186,7 @@ class CorrectedSevenStepPipeline:
         '''Initialize database with enhanced logging tables'''
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         # Create enhanced_pipeline_runs table to track each run
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS enhanced_pipeline_runs (
@@ -201,7 +200,7 @@ class CorrectedSevenStepPipeline:
                 final_success BOOLEAN
             )
         ''')
-        
+
         # Create enhanced_step_responses table for full step data
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS enhanced_step_responses (
@@ -276,7 +275,7 @@ class CorrectedSevenStepPipeline:
 
         metrics_path = os.path.join(self.script_dir, "results", f"metrics_{self.run_timestamp}.json")
         if os.path.exists(metrics_path):
-            with open(metrics_path, "r", encoding="utf-8") as f:
+            with open(metrics_path, encoding="utf-8") as f:
                 metrics = json.load(f)
         else:
             metrics = {"run_timestamp": self.run_timestamp, "steps": {}}
@@ -294,7 +293,7 @@ class CorrectedSevenStepPipeline:
     def _write_final_result(
         self,
         final_result: SevenStepResult,
-        assessment: Optional[Dict[str, Any]] = None,
+        assessment: dict[str, Any] | None = None,
     ) -> None:
         steps_data = []
         for step in final_result.steps_completed:
@@ -309,7 +308,7 @@ class CorrectedSevenStepPipeline:
                 }
             )
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "run_timestamp": self.run_timestamp,
             "topic": final_result.topic,
             "subtopic": final_result.subtopic,
@@ -346,7 +345,7 @@ class CorrectedSevenStepPipeline:
 
         return template
 
-    def _get_tools(self, step_key: str) -> List[Dict[str, Any]]:
+    def _get_tools(self, step_key: str) -> list[dict[str, Any]]:
         '''Retrieve tool specifications for a pipeline step.'''
         tool_entry = self.tools.get(step_key)
 
@@ -359,7 +358,7 @@ class CorrectedSevenStepPipeline:
         return [deepcopy(tool_entry)]
 
 
-    def step1_generate_difficulty_categories(self, topic: str) -> Tuple[bool, Dict[str, List[str]], PipelineStep]:
+    def step1_generate_difficulty_categories(self, topic: str) -> tuple[bool, dict[str, list[str]], PipelineStep]:
         '''Step 1: Generate difficulty categories'''
         template = self._get_prompt_template("step1_difficulty_categories")
         prompt = template.format(topic=topic)
@@ -368,7 +367,7 @@ class CorrectedSevenStepPipeline:
         response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
         step = PipelineStep(1, "Generate difficulty categories", self.model_mid, False, str(response), datetime.now().isoformat())
 
-        categories: Dict[str, List[str]] = {}
+        categories: dict[str, list[str]] = {}
         try:
             if isinstance(response, dict) and 'error' not in response:
                 candidate = response
@@ -397,7 +396,7 @@ class CorrectedSevenStepPipeline:
 
         return step.success, categories, step
 
-    def step2_generate_error_catalog(self, topic: str, subtopic: str, difficulty: str) -> Tuple[bool, List[Dict], PipelineStep]:
+    def step2_generate_error_catalog(self, topic: str, subtopic: str, difficulty: str) -> tuple[bool, list[dict], PipelineStep]:
         '''Step 2: Generate conceptual error catalog - patterns that differentiate strong vs weak models'''
         template = self._get_prompt_template("step2_error_catalog")
         prompt = template.format(topic=topic, difficulty=difficulty, subtopic=subtopic)
@@ -406,7 +405,7 @@ class CorrectedSevenStepPipeline:
         response = self.invoke_model_with_tools(self.model_mid, prompt, tools)
         step = PipelineStep(2, "Generate conceptual error catalog", self.model_mid, False, str(response), datetime.now().isoformat())
 
-        errors: List[Dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
         try:
             if isinstance(response, dict) and isinstance(response.get('errors'), list):
                 raw_errors = response['errors']
@@ -433,7 +432,7 @@ class CorrectedSevenStepPipeline:
 
         return step.success, errors, step
 
-    def step3_generate_strategic_question(self, topic: str, subtopic: str, difficulty: str, error_catalog: List[Dict], previous_failures: List[str] = None, use_thinking: bool = False) -> Tuple[bool, Dict, PipelineStep]:
+    def step3_generate_strategic_question(self, topic: str, subtopic: str, difficulty: str, error_catalog: list[dict], previous_failures: list[str] = None, use_thinking: bool = False) -> tuple[bool, dict, PipelineStep]:
         '''Step 3: Generate strategic implementation challenge (NO pre-embedded errors)'''
         template = self._get_prompt_template("step3_strategic_question")
 
@@ -444,7 +443,7 @@ class CorrectedSevenStepPipeline:
                 + "\n".join(f"- {failure}" for failure in previous_failures)
             )
 
-        catalog_names: List[str] = []
+        catalog_names: list[str] = []
         for error in error_catalog or []:
             name = error.get('mistake')
             if isinstance(name, str) and name.strip():
@@ -469,7 +468,7 @@ class CorrectedSevenStepPipeline:
         )
         step = PipelineStep(3, "Generate strategic implementation challenge", self.model_strong, False, str(response), datetime.now().isoformat())
 
-        question: Dict[str, Any] = {}
+        question: dict[str, Any] = {}
         try:
             if isinstance(response, dict) and 'error' not in response:
                 candidate = response
@@ -503,7 +502,7 @@ class CorrectedSevenStepPipeline:
 
         return step.success, question, step
 
-    def step4_test_sonnet(self, question: Dict) -> Tuple[bool, str, PipelineStep]:
+    def step4_test_sonnet(self, question: dict) -> tuple[bool, str, PipelineStep]:
         '''Step 4: Test Sonnet (Haiku 3.5) implementation response'''
         template = self._get_prompt_template("step4_test_sonnet")
         requirements = question.get('requirements', []) or []
@@ -523,7 +522,7 @@ class CorrectedSevenStepPipeline:
         self._log_step_reward(4, rewards_step45(response, requirements))
         return True, response, step
 
-    def step5_test_haiku(self, question: Dict) -> Tuple[bool, str, PipelineStep]:
+    def step5_test_haiku(self, question: dict) -> tuple[bool, str, PipelineStep]:
         '''Step 5: Test Haiku (Haiku 3) implementation response'''
         template = self._get_prompt_template("step5_test_haiku")
         requirements = question.get('requirements', []) or []
@@ -543,9 +542,9 @@ class CorrectedSevenStepPipeline:
         self._log_step_reward(5, rewards_step45(response, requirements))
         return True, response, step
 
-    def step6_judge_responses(self, question: Dict, sonnet_response: str, haiku_response: str, error_catalog: List[Dict]) -> Tuple[bool, Dict[str, Any], List[str], PipelineStep]:
+    def step6_judge_responses(self, question: dict, sonnet_response: str, haiku_response: str, error_catalog: list[dict]) -> tuple[bool, dict[str, Any], list[str], PipelineStep]:
         '''Step 6: Judge if differentiation was achieved by comparing implementations against error catalog'''
-        
+
         # Format entire error catalog for judge visibility
         error_patterns_text = ""
         for i, error in enumerate(error_catalog or [], 1):
@@ -564,7 +563,7 @@ class CorrectedSevenStepPipeline:
             sonnet_response=sonnet_response,
             haiku_response=haiku_response
         )
-        
+
         tools = self._get_tools("step6_judge_responses")
         response = self.invoke_model_with_tools(self.model_strong, prompt, tools)
         step = PipelineStep(
@@ -576,8 +575,8 @@ class CorrectedSevenStepPipeline:
             datetime.now().isoformat()
         )
 
-        judge_payload: Dict[str, Any] = {}
-        failures_weaker: List[str] = []
+        judge_payload: dict[str, Any] = {}
+        failures_weaker: list[str] = []
         differentiation_achieved = False
 
         try:
@@ -622,11 +621,11 @@ class CorrectedSevenStepPipeline:
         self,
         topic: str,
         subtopic: str,
-        haiku_failures: List[str],
+        haiku_failures: list[str],
         haiku_response: str,
         sonnet_response: str,
-        validation_feedback: Optional[List[str]] = None
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+        validation_feedback: list[str] | None = None
+    ) -> tuple[str, list[dict[str, Any]]]:
         '''Compose the Step 7 prompt (optionally injecting feedback from validation failures).'''
 
         validation_block = ""
@@ -663,9 +662,9 @@ class CorrectedSevenStepPipeline:
 
         return prompt, tools
 
-    def _validate_assessment_payload(self, payload: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], List[str]]:
+    def _validate_assessment_payload(self, payload: dict[str, Any]) -> tuple[bool, dict[str, Any], list[str]]:
         '''Run deterministic checks to ensure Step 7 output matches frontend expectations.'''
-        errors: List[str] = []
+        errors: list[str] = []
 
         if not isinstance(payload, dict):
             return False, {}, ["Model did not return a JSON object."]
@@ -787,14 +786,14 @@ class CorrectedSevenStepPipeline:
 
         return True, sanitized_payload, []
 
-    def step7_create_student_assessment(self, question: Dict, sonnet_response: str, haiku_response: str, haiku_failures: List[str]) -> Tuple[bool, Dict, PipelineStep]:
+    def step7_create_student_assessment(self, question: dict, sonnet_response: str, haiku_response: str, haiku_failures: list[str]) -> tuple[bool, dict, PipelineStep]:
         '''Step 7: Create student assessment with error spans based on actual weak model failures'''
 
         topic = question.get('context', 'AI/ML implementation')
         subtopic = question.get('title', 'Implementation Challenge')
 
-        validation_feedback: Optional[List[str]] = None
-        last_step: Optional[PipelineStep] = None
+        validation_feedback: list[str] | None = None
+        last_step: PipelineStep | None = None
 
         for attempt in range(1, self.step7_max_attempts + 1):
             prompt, tools = self._build_step7_prompt(
@@ -872,17 +871,17 @@ class CorrectedSevenStepPipeline:
     def run_full_pipeline(self, topic: str, max_attempts: int = 3) -> SevenStepResult:
         '''Run the complete corrected 7-step pipeline'''
         logger.info(f"Starting corrected 7-step pipeline for: {topic}")
-        
+
         # Set current topic for database logging
         self.current_topic = topic
-        
+
         # Initialize log file with run header
         with open(self.log_file, "w") as f:
             f.write(f"Pipeline Run Started: {datetime.now()}\n")
             f.write(f"Run ID: {self.run_timestamp}\n")
             f.write(f"Topic: {topic}\n")
             f.write("="*80 + "\n")
-        
+
         steps_completed = []
 
         # Step 1: Generate difficulty categories
@@ -924,7 +923,7 @@ class CorrectedSevenStepPipeline:
             )
             self._write_final_result(result)
             return result
-        
+
         # Retry loop for steps 3-6 (strategic question → implementation testing → differentiation judgment)
         previous_failures = []
         for attempt in range(1, max_attempts + 1):
@@ -1019,7 +1018,7 @@ class CorrectedSevenStepPipeline:
                     failure_text = f"Attempt {attempt}: Insufficient differentiation. Judge: {judge_reasoning_text[:300]}"
 
                 previous_failures.append(failure_text)
-        
+
         # All attempts failed - stopped at Step 6
         result = SevenStepResult(
             topic=topic,
@@ -1234,7 +1233,7 @@ class CorrectedSevenStepPipeline:
         self._write_final_result(final_result)
         yield {"final_result": final_result}
 
-    def run_batch_test(self, topics: List[str]) -> List[SevenStepResult]:
+    def run_batch_test(self, topics: list[str]) -> list[SevenStepResult]:
         '''Run corrected 7-step pipeline on multiple topics'''
         results = []
 
@@ -1253,14 +1252,14 @@ class CorrectedSevenStepPipeline:
                     print(f"   Weak model failures: {', '.join(result.weak_model_failures)}")
                 else:
                     print(f"❌ FAILED: Stopped at Step {result.stopped_at_step} after {result.total_attempts} attempts")
-                
+
                 # Save results
                 # self.save_results(results)
                 return results
-            
-            def save_results(self, results: List[SevenStepResult]):        '''Save comprehensive results'''
+
+            def save_results(self, results: list[SevenStepResult]):        '''Save comprehensive results'''
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Convert to serializable format
         results_data = []
         for result in results:
@@ -1274,7 +1273,7 @@ class CorrectedSevenStepPipeline:
                     "timestamp": step.timestamp,
                     "response_length": len(step.response)
                 })
-            
+
             results_data.append({
                 "topic": result.topic,
                 "subtopic": result.subtopic,
@@ -1287,7 +1286,7 @@ class CorrectedSevenStepPipeline:
                 "weak_model_failures": result.weak_model_failures,
                 "steps_completed": steps_data
             })
-        
+
         final_data = {
             "pipeline_version": "corrected_7step_v1",
             "run_info": {
@@ -1308,11 +1307,11 @@ class CorrectedSevenStepPipeline:
                 "common_weak_model_failures": self._extract_common_failures(results)
             }
         }
-        
+
         filename = os.path.join(self.script_dir, f"corrected_7step_results_{timestamp}.json")
         with open(filename, "w") as f:
             json.dump(final_data, f, indent=2)
-        
+
         print(f"\n📊 Results saved to: {filename}")
         print(f"📝 Detailed logs in: {self.log_file}")
         print(f"💾 Full step data stored in database: {self.db_path}")
@@ -1321,8 +1320,8 @@ class CorrectedSevenStepPipeline:
         # self.save_results(results)
         return results
 
-    
-    def _extract_common_failures(self, results: List[SevenStepResult]) -> Dict[str, int]:
+
+    def _extract_common_failures(self, results: list[SevenStepResult]) -> dict[str, int]:
         '''Extract common patterns from weak model failures'''
         failure_counts = {}
         for result in results:
@@ -1331,7 +1330,7 @@ class CorrectedSevenStepPipeline:
                 normalized = failure.lower().strip()
                 if normalized:
                     failure_counts[normalized] = failure_counts.get(normalized, 0) + 1
-        
+
         # Return top 5 most common failures
         sorted_failures = sorted(failure_counts.items(), key=lambda x: x[1], reverse=True)
         return dict(sorted_failures[:5])
@@ -1339,13 +1338,13 @@ class CorrectedSevenStepPipeline:
 def main():
     '''Run corrected 7-step pipeline test'''
     pipeline = CorrectedSevenStepPipeline()
-    
+
     test_topics = [
         "LLM Post-Training with DPO",
         "Model Quantization and Optimization",
         "Reinforcement Learning from Human Feedback (RLHF)"
     ]
-    
+
     print("🧠 CORRECTED 7-Step Adversarial Pipeline Test")
     print("="*50)
     print("Key Changes:")
@@ -1354,18 +1353,18 @@ def main():
     print("- Step 6: Judge compares implementations vs error catalog")
     print("- Step 7: Creates assessment based on actual weak failures")
     print("="*50)
-    
+
     results = pipeline.run_batch_test(test_topics)
-    
+
     # Summary analysis
     successful = len([r for r in results if r.differentiation_achieved])
     stopped_at_6 = len([r for r in results if r.stopped_at_step == 6])
-    
+
     print("\n🏆 CORRECTED PIPELINE RESULTS")
     print(f"Topics with successful differentiation: {successful}/{len(results)}")
     print(f"Topics stopped at Step 6 (no differentiation): {stopped_at_6}/{len(results)}")
     print(f"Step 6 blocking rate: {(stopped_at_6/len(results))*100:.1f}%")
-    
+
     # Show common failure patterns
     if results:
         common_failures = pipeline._extract_common_failures(results)

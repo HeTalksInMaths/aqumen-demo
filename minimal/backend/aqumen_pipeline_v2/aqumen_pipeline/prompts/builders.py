@@ -1,4 +1,4 @@
-from typing import List, Dict
+
 
 def p_step1_difficulty(topic: str) -> str:
     return (
@@ -18,7 +18,7 @@ def p_step2_error_catalog(topic: str, subtopic: str, difficulty: str, keep_likel
     )
 
 def p_step3_strategic(topic: str, subtopic: str, difficulty: str,
-                      target_names: List[str], previous_failures: List[str]) -> str:
+                      target_names: list[str], previous_failures: list[str]) -> str:
     prev = ("\nVALIDATION FEEDBACK (fix all):\n" + "\n".join(f"- {x}" for x in previous_failures)) if previous_failures else ""
     return (
         f"Create a strategic challenge for '{subtopic}' ({difficulty}) in {topic}.\n"
@@ -29,7 +29,7 @@ def p_step3_strategic(topic: str, subtopic: str, difficulty: str,
         "Return ONLY via strategic_question_tool." + prev
     )
 
-def p_step4_or_5_producer(question: Dict) -> str:
+def p_step4_or_5_producer(question: dict) -> str:
     artifact = question.get("artifact_type", "artifact")
     reqs = "\n".join(f"- {r}" for r in question.get("requirements", []))
     return (
@@ -45,7 +45,7 @@ def p_step4_or_5_producer(question: Dict) -> str:
         "### CONSIDERATIONS\n2–4 bullets on risks, assumptions, or limitations.\n"
     )
 
-def p_step6_judge(question: Dict, catalog_names: List[str],
+def p_step6_judge(question: dict, catalog_names: list[str],
                   impl_mid_text: str, impl_weak_text: str) -> str:
     known = "\n".join(f"- {n}" for n in catalog_names)
     return (
@@ -62,7 +62,7 @@ def p_step6_judge(question: Dict, catalog_names: List[str],
     )
 
 def p_step7_assessment(topic: str, subtopic: str, weak_text: str, mid_text: str,
-                       failures_weaker: List[str], target_error_patterns: List[str]) -> str:
+                       failures_weaker: list[str], target_error_patterns: list[str]) -> str:
     fw = "\n".join(f"- {f}" for f in failures_weaker)
     targets = "\n".join(f"- {t}" for t in target_error_patterns) if target_error_patterns else "(none)"
     return (

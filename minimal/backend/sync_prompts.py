@@ -13,7 +13,7 @@ import difflib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from config import load_prompts, merge_prompt_changes
 
@@ -21,7 +21,7 @@ JSON_FILE = Path(__file__).parent / "prompts.json"
 PROMPTS_CHANGES_FILE = Path(__file__).parent / "prompts_changes.json"
 
 
-def _load_json_file(path: Path, *, allow_missing: bool = False) -> Dict[str, Any]:
+def _load_json_file(path: Path, *, allow_missing: bool = False) -> dict[str, Any]:
     """Load a JSON object from disk."""
     if not path.exists():
         if allow_missing:
@@ -37,7 +37,7 @@ def _load_json_file(path: Path, *, allow_missing: bool = False) -> Dict[str, Any
     return data
 
 
-def _write_json(path: Path, data: Dict[str, Any]) -> None:
+def _write_json(path: Path, data: dict[str, Any]) -> None:
     """Persist a JSON object to disk."""
     with path.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
@@ -81,7 +81,7 @@ def apply_prompts_to_python() -> None:
         meta = {"description": "UI-managed prompt overrides merged on top of prompts.json."}
     meta["last_applied"] = datetime.now().isoformat()
 
-    cleaned_overrides: Dict[str, Any] = {"_meta": meta}
+    cleaned_overrides: dict[str, Any] = {"_meta": meta}
 
     print(f"🧹 Clearing applied overrides in {PROMPTS_CHANGES_FILE}")
     _write_json(PROMPTS_CHANGES_FILE, cleaned_overrides)

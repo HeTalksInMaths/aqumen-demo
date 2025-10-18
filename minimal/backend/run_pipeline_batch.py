@@ -1,7 +1,9 @@
-import time
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
+
 
 def main():
     """Run the corrected 7-step pipeline with a batch of topics and track execution time."""

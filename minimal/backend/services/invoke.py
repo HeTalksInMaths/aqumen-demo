@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 
 from clients.bedrock import BedrockRuntime
 
@@ -17,11 +17,11 @@ class Invoker:
         self,
         model_id: str,
         prompt: str,
-        tools: List[Dict[str, Any]],
+        tools: list[dict[str, Any]],
         max_tokens: int = 2048,
         use_thinking: bool = False,
         thinking_budget: int = 2048,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         try:
             return self.runtime.invoke_with_tools(
                 model_id,

@@ -1,6 +1,7 @@
-from typing import Dict, Any
+from typing import Any
 
-def difficulty_categories_tool() -> Dict[str, Any]:
+
+def difficulty_categories_tool() -> dict[str, Any]:
     return {
         "name": "difficulty_categories_tool",
         "description": "Returns difficulty categories with subtopics",
@@ -15,7 +16,7 @@ def difficulty_categories_tool() -> Dict[str, Any]:
         },
     }
 
-def error_catalog_tool(keep_likelihood: bool = True) -> Dict[str, Any]:
+def error_catalog_tool(keep_likelihood: bool = True) -> dict[str, Any]:
     props = {
         "mistake": {"type": "string"},
         "why_wrong": {"type": "string"},
@@ -43,7 +44,7 @@ def error_catalog_tool(keep_likelihood: bool = True) -> Dict[str, Any]:
         },
     }
 
-def strategic_question_tool() -> Dict[str, Any]:
+def strategic_question_tool() -> dict[str, Any]:
     return {
         "name": "strategic_question_tool",
         "description": "Returns a strategic challenge yielding a concrete artifact",
@@ -63,7 +64,7 @@ def strategic_question_tool() -> Dict[str, Any]:
         },
     }
 
-def judge_decision_tool(include_evidence=True, include_confidence=True) -> Dict[str, Any]:
+def judge_decision_tool(include_evidence=True, include_confidence=True) -> dict[str, Any]:
     props = {
         "differentiation_achieved": {"type": "boolean"},
         "quality_score": {"type": "number"},
@@ -82,7 +83,7 @@ def judge_decision_tool(include_evidence=True, include_confidence=True) -> Dict[
                          "required": ["differentiation_achieved","failures_weaker","reasoning"]},
     }
 
-def student_assessment_tool() -> Dict[str, Any]:
+def student_assessment_tool() -> dict[str, Any]:
     return {
         "name": "student_assessment_tool",
         "description": "Returns assessment JSON for any modality",
