@@ -41,6 +41,22 @@ def calculate_total_cost(pipeline: CorrectedSevenStepPipeline) -> float:
         return 0.0
 
 
+def _run_single_topic(provider: str, topic: str):
+    """
+    Run pipeline for a single topic with its own pipeline instance.
+
+    This ensures thread-safety by creating a separate pipeline instance
+    per topic, avoiding shared mutable state (run_timestamp, current_topic, log_file).
+
+    Returns:
+        tuple: (result, cost) where cost is the total cost for this topic
+    """
+    pipeline = CorrectedSevenStepPipeline(provider=provider)
+    result = pipeline.run_full_pipeline(topic)
+    cost = calculate_total_cost(pipeline)
+    return result, cost
+
+
 def run_batch_with_metrics(
     topics: List[str],
     dataset_file: str,
@@ -66,32 +82,35 @@ def run_batch_with_metrics(
     # Start timer
     start_time = time.time()
 
-    # Initialize pipeline
-    pipeline = CorrectedSevenStepPipeline(provider=provider)
-
     # Run batch
     if parallel:
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         results = []
+        topic_costs = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Each worker gets its own pipeline instance to avoid thread-safety issues
             future_to_topic = {
-                executor.submit(pipeline.run_full_pipeline, topic): topic
+                executor.submit(_run_single_topic, provider, topic): topic
                 for topic in topics
             }
 
             for index, future in enumerate(as_completed(future_to_topic), 1):
                 topic = future_to_topic[future]
                 try:
-                    result = future.result()
+                    result, cost = future.result()
                     results.append(result)
+                    topic_costs.append(cost)
                     success = getattr(result, "differentiation_achieved", False)
                     status = "✅ SUCCESS" if success else "❌ FAILED"
                     print(f"[{index}/{len(topics)}] {topic}: {status}")
                 except Exception as exc:
                     print(f"[{index}/{len(topics)}] {topic}: ❌ ERROR - {exc}")
                     results.append(None)
+                    topic_costs.append(0.0)
     else:
+        # Sequential execution - single pipeline instance is fine
+        pipeline = CorrectedSevenStepPipeline(provider=provider)
         results = pipeline.run_batch_test(topics)
 
         # Print progress
@@ -107,7 +126,10 @@ def run_batch_with_metrics(
     total_time = end_time - start_time
 
     # Calculate metrics
-    total_cost = calculate_total_cost(pipeline)
+    if parallel:
+        total_cost = sum(topic_costs)
+    else:
+        total_cost = calculate_total_cost(pipeline)
 
     successful = sum(
         1 for r in results
