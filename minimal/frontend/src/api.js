@@ -3,7 +3,10 @@
  * Connects React frontend to FastAPI backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL) ||
+  process?.env?.VITE_API_URL ||
+  'http://localhost:8000';
 
 /**
  * Fetch a question from the pipeline (blocking - waits for complete result)
@@ -148,7 +151,7 @@ export const fetchQuestionStreaming = (
  * @param {Object} step7Data - Assessment from Step 7
  * @returns {Object} - Question in React format
  */
-const transformStep7ToReact = (step7Data) => {
+export const transformStep7ToReact = (step7Data) => {
   if (!step7Data || !step7Data.code || !step7Data.errors) {
     throw new Error('Invalid assessment format from pipeline');
   }

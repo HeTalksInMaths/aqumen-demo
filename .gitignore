@@ -196,6 +196,7 @@ dist/
 .nyc_output/
 test-results/
 coverage/
+/minimal/backend/results
 
 # === PROJECT SPECIFIC ===
 # Large model files (if any)
@@ -239,6 +240,9 @@ tests/
 **/playwright.config.ts
 **/.eslintignore
 **/.eslintrc.cjs
+# Allow committed end-to-end tests for the minimal frontend app
+!minimal/frontend/tests/
+!minimal/frontend/tests/**
 
 # Temporary frontend scripts
 **/fix_demo_data.py

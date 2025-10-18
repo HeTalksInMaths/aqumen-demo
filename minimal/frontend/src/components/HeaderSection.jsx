@@ -1,17 +1,10 @@
 import React from 'react';
 import { Award, Loader, Sparkles } from 'lucide-react';
-import PasswordModal from './PasswordModal';
-
 const HeaderSection = ({
   isDevMode,
   viewMode,
   setViewMode,
   handleDevModeClick,
-  showPasswordPrompt,
-  devPassword,
-  setDevPassword,
-  checkDevPassword,
-  cancelPasswordPrompt,
   pipelineSteps,
   generationMode,
   setGenerationMode,
@@ -89,13 +82,6 @@ const HeaderSection = ({
         </button>
       </div>
 
-      <PasswordModal
-        isOpen={showPasswordPrompt}
-        password={devPassword}
-        setPassword={setDevPassword}
-        onSubmit={checkDevPassword}
-        onCancel={cancelPasswordPrompt}
-      />
 
       {viewMode === 'student' && pipelineSteps.length > 0 && (
         <div className="mb-4 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2 text-xs text-purple-700">
