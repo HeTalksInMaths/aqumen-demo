@@ -15,4 +15,10 @@ services:
         value: us-west-2
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: DATABASE_URL
+        sync: false
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
     healthCheckPath: /health
