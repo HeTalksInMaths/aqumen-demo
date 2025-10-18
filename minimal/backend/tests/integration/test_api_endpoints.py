@@ -5,10 +5,10 @@ These tests capture the current behavior of api_server.py before refactoring.
 They ensure that refactored code maintains backward compatibility.
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
-import os
-import json
 
 # Set mock mode to avoid needing AWS credentials
 os.environ["AQU_MOCK_PIPELINE"] = "1"
@@ -75,26 +75,29 @@ class TestGenerateEndpoint:
 
     def test_generate_requires_topic(self, client):
         """Test that generation fails without a topic."""
-        response = client.post("/api/generate", json={
-            "topic": "",  # Empty topic should fail validation
-            "max_retries": 3
-        })
+        response = client.post(
+            "/api/generate",
+            json={
+                "topic": "",  # Empty topic should fail validation
+                "max_retries": 3,
+            },
+        )
         assert response.status_code == 422  # Validation error
 
     def test_generate_validates_topic_length(self, client):
         """Test that topic must meet minimum length."""
-        response = client.post("/api/generate", json={
-            "topic": "AB",  # Too short (min is 3)
-            "max_retries": 3
-        })
+        response = client.post(
+            "/api/generate",
+            json={
+                "topic": "AB",  # Too short (min is 3)
+                "max_retries": 3,
+            },
+        )
         assert response.status_code == 422
 
     def test_generate_fails_in_mock_mode(self, client):
         """Test that generation fails gracefully in mock mode."""
-        response = client.post("/api/generate", json={
-            "topic": "Machine Learning Optimization",
-            "max_retries": 3
-        })
+        response = client.post("/api/generate", json={"topic": "Machine Learning Optimization", "max_retries": 3})
         # Should fail with 503 because pipeline is disabled in mock mode
         assert response.status_code == 503
 
@@ -141,7 +144,7 @@ class TestPromptEndpoints:
             "step4_test_sonnet",
             "step5_test_haiku",
             "step6_judge_responses",
-            "step7_student_assessment"
+            "step7_student_assessment",
         ]
         for key in expected_keys:
             assert key in prompts, f"Missing prompt key: {key}"
@@ -153,18 +156,15 @@ class TestPromptEndpoints:
 
     def test_update_prompt_validates_step_name(self, client):
         """Test that update prompt validates step name."""
-        response = client.post("/api/update-prompt", json={
-            "step": "invalid_step_name",
-            "new_prompt": "Test prompt"
-        })
+        response = client.post("/api/update-prompt", json={"step": "invalid_step_name", "new_prompt": "Test prompt"})
         assert response.status_code == 400
 
     def test_update_prompt_success(self, client):
         """Test successful prompt update."""
-        response = client.post("/api/update-prompt", json={
-            "step": "step1_difficulty_categories",
-            "new_prompt": "Test prompt template for integration testing"
-        })
+        response = client.post(
+            "/api/update-prompt",
+            json={"step": "step1_difficulty_categories", "new_prompt": "Test prompt template for integration testing"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -186,9 +186,7 @@ class TestStep1Endpoint:
 
     def test_step1_fails_in_mock_mode(self, client):
         """Test that step1 fails gracefully in mock mode."""
-        response = client.post("/api/step1", json={
-            "topic": "Deep Learning"
-        })
+        response = client.post("/api/step1", json={"topic": "Deep Learning"})
         # Should fail with 503 because pipeline is disabled in mock mode
         assert response.status_code == 503
 
@@ -204,9 +202,7 @@ class TestModelTestingEndpoint:
 
     def test_test_models_accepts_provider(self, client):
         """Test that model testing accepts provider parameter."""
-        response = client.post("/api/test-models", json={
-            "provider": "anthropic"
-        })
+        response = client.post("/api/test-models", json={"provider": "anthropic"})
         # Should fail in mock mode
         assert response.status_code in [200, 503]
 
@@ -244,4 +240,4 @@ class TestResponseModels:
 
 
 # Integration test configuration
-pytest_plugins = ['pytest_asyncio']
+pytest_plugins = ["pytest_asyncio"]
