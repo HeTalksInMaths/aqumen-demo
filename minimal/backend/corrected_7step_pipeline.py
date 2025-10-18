@@ -146,7 +146,7 @@ class CorrectedSevenStepPipeline:
         prompt: str,
         tools: List[Dict[str, Any]],
         use_thinking: bool = False,
-        reasoning_effort: str = "medium",
+        reasoning_effort: str = "low",
     ) -> Dict[str, Any]:
         '''Invoke a model via the Bedrock runtime wrapper with tool support.'''
         safe_use_thinking = use_thinking and self.judge_supports_thinking
@@ -463,7 +463,7 @@ class CorrectedSevenStepPipeline:
             prompt,
             tools,
             use_thinking=use_thinking,
-            reasoning_effort="medium"
+            reasoning_effort="low"
         )
         step = PipelineStep(3, "Generate strategic implementation challenge", self.model_strong, False, str(response), datetime.now().isoformat())
 
@@ -576,7 +576,7 @@ class CorrectedSevenStepPipeline:
         )
         
         tools = self._get_tools("step6_judge_responses")
-        response = self.invoke_model_with_tools(self.model_strong, prompt, tools, reasoning_effort="medium")
+        response = self.invoke_model_with_tools(self.model_strong, prompt, tools, reasoning_effort="low")
         step = PipelineStep(
             6,
             "Judge implementation differentiation",
@@ -828,7 +828,7 @@ class CorrectedSevenStepPipeline:
                 prompt,
                 tools,
                 use_thinking=use_thinking,
-                reasoning_effort="medium"
+                reasoning_effort="low"
             )
             step = PipelineStep(
                 7,
