@@ -3,18 +3,24 @@ import json
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Iterable, List
+from typing import Callable, Iterable, List
 
 from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
 DEFAULT_WORKERS = 5
 
 
-def _run_parallel(pipeline: CorrectedSevenStepPipeline, topics: Iterable[str], max_workers: int) -> List:
+def _run_parallel(factory: Callable[[], CorrectedSevenStepPipeline], topics: Iterable[str], max_workers: int) -> List:
     """Execute each topic in its own thread and stream progress."""
     results = []
+
+    def run_topic(topic: str):
+        # Each topic gets its own pipeline instance to avoid shared mutable state
+        topic_pipeline = factory()
+        return topic_pipeline.run_full_pipeline(topic)
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_topic = {executor.submit(pipeline.run_full_pipeline, topic): topic for topic in topics}
+        future_to_topic = {executor.submit(run_topic, topic): topic for topic in topics}
         for index, future in enumerate(as_completed(future_to_topic), 1):
             topic = future_to_topic[future]
             try:
@@ -47,12 +53,16 @@ def main(topics, *, parallel: bool = False, max_workers: int = DEFAULT_WORKERS):
     print("Running in parallel mode." if parallel else "Running in sequential mode.")
     start_time = time.time()
 
-    pipeline = CorrectedSevenStepPipeline()
+    pipeline_factory: Callable[[], CorrectedSevenStepPipeline] = CorrectedSevenStepPipeline
+
+    pipeline_for_results: CorrectedSevenStepPipeline
 
     if parallel:
-        results = _run_parallel(pipeline, topics, max_workers)
+        results = _run_parallel(pipeline_factory, topics, max_workers)
+        pipeline_for_results = pipeline_factory()
     else:
-        results = pipeline.run_batch_test(topics)
+        pipeline_for_results = pipeline_factory()
+        results = pipeline_for_results.run_batch_test(topics)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -65,7 +75,7 @@ def main(topics, *, parallel: bool = False, max_workers: int = DEFAULT_WORKERS):
     print(f"Estimated total cost: ${total_cost:.2f}")
 
     try:
-        pipeline.save_results(results)
+        pipeline_for_results.save_results(results)
     except AttributeError:
         # Older pipeline implementations may not expose save_results
         pass
