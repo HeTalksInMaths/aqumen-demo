@@ -5,11 +5,7 @@ These tests capture the current behavior of corrected_7step_pipeline.py before r
 Note: These tests require valid AWS credentials or mock implementations.
 """
 
-import pytest
-import json
-import os
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 
 class TestPipelineConfiguration:
@@ -18,18 +14,15 @@ class TestPipelineConfiguration:
     def test_pipeline_import(self):
         """Test that pipeline module can be imported."""
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
+
         assert CorrectedSevenStepPipeline is not None
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_pipeline_initialization_with_anthropic(self, mock_provider):
         """Test pipeline initializes with Anthropic provider."""
         # Mock the provider response
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -40,15 +33,11 @@ class TestPipelineConfiguration:
         assert pipeline.model_mid == "claude-sonnet-3.5"
         assert pipeline.model_weak == "claude-haiku-3"
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_pipeline_initialization_with_openai(self, mock_provider):
         """Test pipeline initializes with OpenAI provider."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "gpt-4",
-            "mid": "gpt-3.5-turbo",
-            "weak": "gpt-3.5-turbo"
-        }
+        mock_models = {"strong": "gpt-4", "mid": "gpt-3.5-turbo", "weak": "gpt-3.5-turbo"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -63,8 +52,9 @@ class TestPipelineStepDataclasses:
 
     def test_pipeline_step_creation(self):
         """Test PipelineStep dataclass can be created."""
-        from corrected_7step_pipeline import PipelineStep
         from datetime import datetime
+
+        from corrected_7step_pipeline import PipelineStep
 
         step = PipelineStep(
             step_number=1,
@@ -72,7 +62,7 @@ class TestPipelineStepDataclasses:
             model_used="test-model",
             success=True,
             response="test response",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
 
         assert step.step_number == 1
@@ -81,8 +71,9 @@ class TestPipelineStepDataclasses:
 
     def test_seven_step_result_creation(self):
         """Test SevenStepResult dataclass can be created."""
-        from corrected_7step_pipeline import SevenStepResult, PipelineStep
         from datetime import datetime
+
+        from corrected_7step_pipeline import PipelineStep, SevenStepResult
 
         step = PipelineStep(
             step_number=1,
@@ -90,7 +81,7 @@ class TestPipelineStepDataclasses:
             model_used="model",
             success=True,
             response="response",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
 
         result = SevenStepResult(
@@ -103,7 +94,7 @@ class TestPipelineStepDataclasses:
             differentiation_achieved=True,
             student_assessment_created=True,
             total_attempts=1,
-            weak_model_failures=[]
+            weak_model_failures=[],
         )
 
         assert result.topic == "Test Topic"
@@ -114,16 +105,12 @@ class TestPipelineStepDataclasses:
 class TestPipelineValidation:
     """Test suite for validation methods."""
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_validate_assessment_payload_structure(self, mock_provider):
         """Test assessment validation checks required fields."""
         # Setup mock
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -136,15 +123,11 @@ class TestPipelineValidation:
         assert is_valid is False
         assert len(errors) > 0
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_validate_assessment_difficulty(self, mock_provider):
         """Test assessment validation checks difficulty values."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -157,7 +140,7 @@ class TestPipelineValidation:
             "difficulty": "InvalidLevel",
             "content_type": "code",
             "content": ["line1", "line2"] * 15,  # 30 lines
-            "errors": [{"id": "test error description", "description": "Test error"}]
+            "errors": [{"id": "test error description", "description": "Test error"}],
         }
 
         is_valid, sanitized, errors = pipeline._validate_assessment_payload(payload)
@@ -168,15 +151,11 @@ class TestPipelineValidation:
 class TestPipelineLogging:
     """Test suite for pipeline logging functionality."""
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_log_file_creation(self, mock_provider):
         """Test that pipeline creates timestamped log files."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -184,19 +163,15 @@ class TestPipelineLogging:
         pipeline = CorrectedSevenStepPipeline(provider="anthropic")
 
         # Check log file path is set
-        assert hasattr(pipeline, 'log_file')
-        assert 'pipeline_run_' in pipeline.log_file
-        assert pipeline.log_file.endswith('.txt')
+        assert hasattr(pipeline, "log_file")
+        assert "pipeline_run_" in pipeline.log_file
+        assert pipeline.log_file.endswith(".txt")
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_results_file_creation(self, mock_provider):
         """Test that pipeline creates timestamped results files."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -204,30 +179,26 @@ class TestPipelineLogging:
         pipeline = CorrectedSevenStepPipeline(provider="anthropic")
 
         # Check results file path is set
-        assert hasattr(pipeline, 'results_file')
-        assert 'corrected_7step_results_' in pipeline.results_file
-        assert pipeline.results_file.endswith('.json')
+        assert hasattr(pipeline, "results_file")
+        assert "corrected_7step_results_" in pipeline.results_file
+        assert pipeline.results_file.endswith(".json")
 
 
 class TestPromptTemplates:
     """Test suite for prompt template loading."""
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_prompts_loaded(self, mock_provider):
         """Test that prompts are loaded during initialization."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
         pipeline = CorrectedSevenStepPipeline(provider="anthropic")
 
-        assert hasattr(pipeline, 'prompts')
+        assert hasattr(pipeline, "prompts")
         assert isinstance(pipeline.prompts, dict)
 
         # Check for expected prompt keys
@@ -238,21 +209,17 @@ class TestPromptTemplates:
             "step4_test_sonnet",
             "step5_test_haiku",
             "step6_judge_responses",
-            "step7_student_assessment"
+            "step7_student_assessment",
         ]
 
         for key in expected_keys:
             assert key in pipeline.prompts, f"Missing prompt: {key}"
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_get_prompt_template(self, mock_provider):
         """Test _get_prompt_template method."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
@@ -268,25 +235,21 @@ class TestPromptTemplates:
 class TestDatabaseIntegration:
     """Test suite for database operations."""
 
-    @patch('corrected_7step_pipeline.get_model_provider')
+    @patch("legacy_pipeline.orchestrator.get_model_provider")
     def test_repo_initialized(self, mock_provider):
         """Test that database repository is initialized."""
         mock_runtime = Mock()
-        mock_models = {
-            "strong": "claude-opus-4",
-            "mid": "claude-sonnet-3.5",
-            "weak": "claude-haiku-3"
-        }
+        mock_models = {"strong": "claude-opus-4", "mid": "claude-sonnet-3.5", "weak": "claude-haiku-3"}
         mock_provider.return_value = (mock_runtime, mock_models)
 
         from corrected_7step_pipeline import CorrectedSevenStepPipeline
 
         pipeline = CorrectedSevenStepPipeline(provider="anthropic")
 
-        assert hasattr(pipeline, 'repo')
-        assert hasattr(pipeline, 'db_path')
-        assert pipeline.db_path.endswith('pipeline_results.db')
+        assert hasattr(pipeline, "repo")
+        assert hasattr(pipeline, "db_path")
+        assert pipeline.db_path.endswith("pipeline_results.db")
 
 
 # Configuration
-pytest_plugins = ['pytest_asyncio']
+pytest_plugins = ["pytest_asyncio"]
