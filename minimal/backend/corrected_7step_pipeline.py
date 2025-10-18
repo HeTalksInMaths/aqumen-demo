@@ -115,9 +115,8 @@ class CorrectedSevenStepPipeline:
         os.makedirs(os.path.join(script_dir, "logs", "archived"), exist_ok=True)
         os.makedirs(results_dir, exist_ok=True)
         
-        # Initialize database connection relative to the script's location
-        self.db_path = os.path.join(script_dir, "pipeline_results.db")
-        self.repo = Repo(self.db_path)
+        # Initialize database connection using DATABASE_URL env var or fallback to local SQLite
+        self.repo = Repo()
 
         # Step 7 validation configuration
         self.allowed_difficulties = {"Beginner", "Intermediate", "Advanced", "Expert"}
